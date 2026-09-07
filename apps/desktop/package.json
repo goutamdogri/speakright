@@ -1,0 +1,37 @@
+{
+  "name": "@speakright/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev --noSandbox",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src --ext .ts,.tsx"
+  },
+  "dependencies": {
+    "@speakright/audio": "workspace:*",
+    "@speakright/correction": "workspace:*",
+    "@speakright/database": "workspace:*",
+    "@speakright/queue": "workspace:*",
+    "@speakright/settings": "workspace:*",
+    "@speakright/shared": "workspace:*",
+    "@speakright/transcription": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.5.5",
+    "electron": "^31.3.0",
+    "electron-vite": "^2.3.0",
+    "postcss": "^8.5.28",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^3.4.10",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.0"
+  }
+}

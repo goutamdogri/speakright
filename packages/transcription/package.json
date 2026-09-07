@@ -1,0 +1,26 @@
+{
+  "name": "@speakright/transcription",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@speakright/shared": "workspace:*",
+    "sherpa-onnx-node": "^1.13.7"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}
