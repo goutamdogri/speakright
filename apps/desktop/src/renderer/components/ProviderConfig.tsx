@@ -16,6 +16,14 @@ const STT_OPTIONS = [
 
 const WHISPER_MODEL_OPTIONS = ['base', 'small', 'medium', 'large'] as const;
 
+const DEFAULT_STT_MODEL: Record<string, string> = {
+  'local-whisper': 'base',
+  'sherpa-onnx': 'streaming-zipformer-en',
+  groq: 'whisper-large-v3-turbo',
+  openai: 'whisper-1',
+  gemini: 'gemini-2.0-flash',
+};
+
 const LLM_OPTIONS = [
   { value: 'ollama', label: 'Ollama (Local Model)' },
   { value: 'groq', label: 'Groq LLM (Cloud)' },
@@ -30,6 +38,12 @@ export function ProviderSettings({ settings, onUpdate }: Props) {
     onUpdate({ provider: { ...provider, ...patch } });
   };
 
+  const setSttProvider = (stt: any) => {
+    // sttModel is per-provider; reset it so switching providers never reuses
+    // a model name that belongs to a different STT backend.
+    onUpdate({ provider: { ...provider, stt, sttModel: DEFAULT_STT_MODEL[stt] ?? '' } });
+  };
+
   return (
     <>
       <Section title="Speech-to-Text (STT) Provider">
@@ -37,7 +51,7 @@ export function ProviderSettings({ settings, onUpdate }: Props) {
           <select
             className={inputCls}
             value={provider.stt}
-            onChange={e => setProvider({ stt: e.target.value as any })}
+            onChange={e => setSttProvider(e.target.value)}
           >
             {STT_OPTIONS.map(o => (
               <option key={o.value} value={o.value}>{o.label}</option>
