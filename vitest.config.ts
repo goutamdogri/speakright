@@ -9,6 +9,7 @@ export default defineConfig({
   resolve: {
     alias: {
       'electron': resolve(__dirname, 'tests/mocks/electron.ts'),
+      '@speakright/secrets': resolve(__dirname, 'packages/secrets/src/index.ts'),
       '@speakright/shared': resolve(__dirname, 'packages/shared/src/index.ts'),
       '@speakright/queue': resolve(__dirname, 'packages/queue/src/index.ts'),
       '@speakright/audio': resolve(__dirname, 'packages/audio/src/index.ts'),

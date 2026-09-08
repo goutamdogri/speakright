@@ -18,7 +18,7 @@
     "test:watch": "vitest",
     "test:integration": "bash scripts/run-integration.sh db",
     "test:e2e": "bash scripts/run-integration.sh e2e",
-    "rebuild": "electron-rebuild -f -w better-sqlite3 --types=prod,dev,optional",
+    "rebuild": "electron-rebuild -f -w better-sqlite3 --types=prod,dev,optional && electron-rebuild -f -w=sherpa-onnx-node",
     "format": "prettier --write \"**/*.{ts,tsx,json,md,yaml}\"",
     "clean": "pnpm -r exec rm -rf node_modules dist build tsconfig.tsbuildinfo"
   },

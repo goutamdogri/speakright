@@ -1,6 +1,7 @@
 import type { SpeechToTextProvider, TranscriptionOptions } from '../types.js';
 import type { Transcript, STTProvider } from '@speakright/shared';
 import { pcmToWavBlob } from '../audio-utils.js';
+import { fetchOpenAiLikeModels } from '../model-lists.js';
 
 /**
  * OpenAI Whisper STT adapter.
@@ -61,6 +62,14 @@ export class OpenAiSttProvider implements SpeechToTextProvider {
   }
 
   async listModels(): Promise<string[]> {
-    return ['gpt-4o-mini-transcribe', 'gpt-4o-transcribe', 'whisper-1'];
+    return fetchOpenAiLikeModels(
+      'https://api.openai.com/v1',
+      this.apiKey,
+      id => {
+        const lower = id.toLowerCase();
+        return lower.includes('whisper') || lower.includes('transcribe');
+      },
+      ['gpt-4o-mini-transcribe', 'gpt-4o-transcribe', 'whisper-1'],
+    );
   }
 }

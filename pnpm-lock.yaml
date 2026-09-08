@@ -50,6 +50,9 @@ importers:
       '@speakright/queue':
         specifier: workspace:*
         version: link:../../packages/queue
+      '@speakright/secrets':
+        specifier: workspace:*
+        version: link:../../packages/secrets
       '@speakright/settings':
         specifier: workspace:*
         version: link:../../packages/settings
@@ -143,6 +146,16 @@ importers:
         version: 5.9.3
 
   packages/queue:
+    dependencies:
+      '@speakright/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      typescript:
+        specifier: ^5.5.4
+        version: 5.9.3
+
+  packages/secrets:
     dependencies:
       '@speakright/shared':
         specifier: workspace:*

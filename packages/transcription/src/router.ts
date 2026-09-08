@@ -13,6 +13,10 @@ export class SpeechToTextRouter {
     this.providers.set(provider.id, provider);
   }
 
+  getProvider(id: STTProvider): SpeechToTextProvider | null {
+    return this.providers.get(id) ?? null;
+  }
+
   unregister(id: STTProvider): void {
     this.providers.delete(id);
   }

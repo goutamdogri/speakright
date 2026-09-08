@@ -16,6 +16,7 @@ declare global {
 }
 
 type HealthCheck = Record<string, { ok: boolean; message: string }>;
+type ProviderHealth = { stt: HealthCheck; llm: HealthCheck };
 
 type LiveEvent =
   | { kind: 'speaking'; value: boolean; at: number }
@@ -56,7 +57,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [listening, setListening] = useState<ListeningState>('disabled');
-  const [health, setHealth] = useState<HealthCheck | null>(null);
+  const [health, setHealth] = useState<ProviderHealth | null>(null);
   const [speaking, setSpeaking] = useState(false);
   const [liveEvents, setLiveEvents] = useState<LiveEntry[]>([]);
 
@@ -109,7 +110,7 @@ export default function App() {
   };
 
   const checkHealth = () => {
-    window.speakright.checkProviders().then((h: HealthCheck) => setHealth(h));
+    window.speakright.checkProviders().then((h: ProviderHealth) => setHealth(h));
   };
 
   if (loading) {
@@ -242,16 +243,9 @@ export default function App() {
                 </button>
               </div>
               {health ? (
-                <div className="space-y-2">
-                  {Object.entries(health).map(([name, h]) => (
-                    <div key={name} className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">{name}</span>
-                      <span className={`inline-flex items-center gap-1.5 ${h.ok ? 'text-green-600' : 'text-red-600'}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${h.ok ? 'bg-green-500' : 'bg-red-500'}`} />
-                        {h.ok ? 'Ready' : h.message}
-                      </span>
-                    </div>
-                  ))}
+                <div className="space-y-3">
+                  <HealthGroup title="Speech-to-text" checks={health.stt} />
+                  <HealthGroup title="Language model" checks={health.llm} />
                 </div>
               ) : (
                 <p className="text-sm text-slate-400">
@@ -278,6 +272,25 @@ export default function App() {
         {tab === 'correction' && <CorrectionSettings settings={settings} onUpdate={updateSettings} />}
         {tab === 'history' && <HistoryView />}
       </main>
+    </div>
+  );
+}
+
+function HealthGroup({ title, checks }: { title: string; checks: HealthCheck }) {
+  return (
+    <div>
+      <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">{title}</h3>
+      <div className="space-y-2">
+        {Object.entries(checks).map(([name, h]) => (
+          <div key={name} className="flex items-center justify-between text-sm">
+            <span className="text-slate-600">{name}</span>
+            <span className={`inline-flex items-center gap-1.5 ${h.ok ? 'text-green-600' : 'text-red-600'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${h.ok ? 'bg-green-500' : 'bg-red-500'}`} />
+              {h.ok ? 'Ready' : h.message}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

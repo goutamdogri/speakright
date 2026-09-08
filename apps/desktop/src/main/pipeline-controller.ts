@@ -4,6 +4,7 @@ import type {
   DisplayCorrection,
   ListeningState,
   PipelineStatus,
+  CloudProvider,
 } from '@speakright/shared';
 import type {
   SessionRepository,
@@ -24,6 +25,11 @@ export interface PipelineOptions {
   audioHost: AudioHostController;
   onCorrection: (display: DisplayCorrection) => void;
   onLiveEvent?: (event: PipelineLiveEvent) => void;
+  /**
+   * Resolves a cloud API key for a provider. Called in the main process only;
+   * the resolved value is handed to the worker and never sent to a renderer.
+   */
+  getApiKey?: (provider: CloudProvider) => string | null;
 }
 
 /** Live telemetry emitted by the pipeline for UI streaming. */
@@ -59,12 +65,7 @@ export class PipelineController {
   constructor(options: PipelineOptions) {
     this.options = options;
 
-    this.worker = new PipelineWorker({
-      sttProvider: options.settings.getSection('provider').stt,
-      sttModel: options.settings.getSection('provider').sttModel,
-      llmProvider: options.settings.getSection('provider').llm,
-      llmModel: options.settings.getSection('provider').llmModel,
-    });
+    this.worker = new PipelineWorker(this.resolveWorkerConfig());
 
     const overlay = options.settings.getSection('overlay');
     const correction = options.settings.getSection('correction');
@@ -241,19 +242,47 @@ export class PipelineController {
     return this.worker.getSttHealth();
   }
 
+  getLlmHealth(): Record<string, { ok: boolean; message: string }> {
+    return this.worker.getLlmHealth();
+  }
+
+  /** Real connectivity: cloud providers hit their API endpoints. */
+  checkSttHealth(): Promise<Record<string, { ok: boolean; message: string }>> {
+    return this.worker.checkSttHealth();
+  }
+
+  checkLlmHealth(): Promise<Record<string, { ok: boolean; message: string }>> {
+    return this.worker.checkLlmHealth();
+  }
+
+  listSttModels(): Promise<string[]> {
+    return this.worker.listSttModels();
+  }
+
+  listLlmModels(): Promise<string[]> {
+    return this.worker.listLlmModels();
+  }
+
   notifySettingsChanged(): void {
     const provider = this.options.settings.getSection('provider');
-    this.worker.updateProviders({
-      sttProvider: provider.stt,
-      sttModel: provider.sttModel,
-      llmProvider: provider.llm,
-      llmModel: provider.llmModel,
-    });
+    this.worker.updateProviders(this.resolveWorkerConfig(provider));
 
     const overlay = this.options.settings.getSection('overlay');
     // Rebuild queue options (displayDurationMs can be changed at runtime).
     // TODO: Make queue options mutable rather than recreating.
     void overlay;
+  }
+
+  private resolveWorkerConfig(provider = this.options.settings.getSection('provider')) {
+    return {
+      sttProvider: provider.stt,
+      sttModel: provider.sttModel,
+      llmProvider: provider.llm,
+      llmModel: provider.llmModel,
+      groqApiKey: this.options.getApiKey?.('groq') ?? undefined,
+      openaiApiKey: this.options.getApiKey?.('openai') ?? undefined,
+      geminiApiKey: this.options.getApiKey?.('gemini') ?? undefined,
+    };
   }
 
   stop(): void {

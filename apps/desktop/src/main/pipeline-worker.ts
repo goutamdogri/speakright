@@ -47,11 +47,91 @@ export class PipelineWorker {
     this.llmRouter = new CorrectionRouter();
     this.registerProviders();
     this.setActive();
+    // Self-heal a stale persisted model (e.g. a retired Groq model id) against
+    // the provider's live catalog, without waiting for the user to re-pick.
+    void this.validateProviderModels();
   }
 
   updateProviders(partial: Partial<WorkerConfig>): void {
-    this.config = { ...this.config, ...partial };
+    const next = { ...this.config, ...partial };
+    // Providers capture their API key / binary / model dir at construction, so a
+    // runtime change to any of those must rebuild the routers (otherwise a saved
+    // key never reaches the registered provider → 401 on transcribe). Fields not
+    // affecting providers (e.g. bare model-name switches) skip the rebuild to
+    // avoid dropping the Sherpa recognizer cache.
+    const relevant = [
+      'sttProvider', 'sttModel', 'llmProvider', 'llmModel',
+      'whisperBinPath', 'whisperModelDir', 'sherpaModelDir',
+      'groqApiKey', 'openaiApiKey', 'geminiApiKey',
+    ] as const;
+    const changed = relevant.some(k => next[k] !== this.config[k]);
+    this.config = next;
+    if (changed) this.registerProviders();
     this.setActive();
+    // Re-validate the active model against the provider's live catalog.
+    void this.validateProviderModels();
+  }
+
+  private validateInFlight = false;
+  private revalidateRequested = false;
+  private static readonly CLOUD_STT = new Set<STTProvider>(['groq', 'openai', 'gemini']);
+  private static readonly CLOUD_LLM = new Set<LLMProvider>(['groq', 'openai', 'gemini']);
+  private static readonly PREFERRED_STT_MODEL: Record<string, string> = {
+    groq: 'whisper-large-v3-turbo',
+    openai: 'gpt-4o-mini-transcribe',
+    gemini: 'gemini-2.5-flash',
+  };
+  private static readonly PREFERRED_LLM_MODEL: Record<string, string> = {
+    groq: 'qwen/qwen3.6-27b',
+    openai: 'gpt-4o-mini',
+    gemini: 'gemini-2.5-flash',
+  };
+
+  /**
+   * If the configured cloud model is stale (retired by the provider), switch
+   * to the provider's preferred current model from its live catalog. Runs
+   * fire-and-forget after any provider-config change and at startup, so a
+   * persisted id that 404s never reaches transcription.
+   */
+  private async validateProviderModels(): Promise<void> {
+    if (this.validateInFlight) {
+      this.revalidateRequested = true;
+      return;
+    }
+    this.validateInFlight = true;
+    try {
+      do {
+        this.revalidateRequested = false;
+        const patch: Partial<WorkerConfig> = {};
+        if (PipelineWorker.CLOUD_STT.has(this.config.sttProvider)) {
+          try {
+            const list = await this.sttRouter.getActive().listModels();
+            if (list.length && !list.includes(this.config.sttModel)) {
+              patch.sttModel = list.includes(PipelineWorker.PREFERRED_STT_MODEL[this.config.sttProvider])
+                ? PipelineWorker.PREFERRED_STT_MODEL[this.config.sttProvider]
+                : list[0];
+            }
+          } catch { /* offline: keep the configured model */ }
+        }
+        if (PipelineWorker.CLOUD_LLM.has(this.config.llmProvider)) {
+          try {
+            const list = await this.llmRouter.getActive().listModels();
+            if (list.length && !list.includes(this.config.llmModel)) {
+              patch.llmModel = list.includes(PipelineWorker.PREFERRED_LLM_MODEL[this.config.llmProvider])
+                ? PipelineWorker.PREFERRED_LLM_MODEL[this.config.llmProvider]
+                : list[0];
+            }
+          } catch { /* offline: keep the configured model */ }
+        }
+        if (Object.keys(patch).length) {
+          this.config = { ...this.config, ...patch };
+          this.registerProviders();
+          this.setActive();
+        }
+      } while (this.revalidateRequested);
+    } finally {
+      this.validateInFlight = false;
+    }
   }
 
   async transcribe(audio: Uint8Array, language = 'en'): Promise<Transcript> {
@@ -65,11 +145,38 @@ export class PipelineWorker {
     return this.llmRouter.correct({ transcript, context });
   }
 
+  /** Model catalog of the active STT provider (live fetch w/ curated fallback). */
+  async listSttModels(): Promise<string[]> {
+    try {
+      return await this.sttRouter.listAvailableModels();
+    } catch {
+      return [];
+    }
+  }
+
+  /** Model catalog of the active LLM provider (live fetch w/ curated fallback). */
+  async listLlmModels(): Promise<string[]> {
+    try {
+      return await this.llmRouter.listAvailableModels();
+    } catch {
+      return [];
+    }
+  }
+
   getSttHealth(): Record<STTProvider, { ok: boolean; message: string }> {
     // Return synchronous status based on config
     const result = {} as Record<STTProvider, { ok: boolean; message: string }>;
     result['local-whisper'] = this.localWhisperHealth();
     result['sherpa-onnx'] = this.localSherpaHealth();
+    result.groq = this.simpleHealth('groq');
+    result.openai = this.simpleHealth('openai');
+    result.gemini = this.simpleHealth('gemini');
+    return result;
+  }
+
+  getLlmHealth(): Record<LLMProvider, { ok: boolean; message: string }> {
+    const result = {} as Record<LLMProvider, { ok: boolean; message: string }>;
+    result.ollama = { ok: true, message: this.config.llmModel ? `Ollama (${this.config.llmModel}) — ensure the server is running` : 'Ollama configured' };
     result.groq = this.simpleHealth('groq');
     result.openai = this.simpleHealth('openai');
     result.gemini = this.simpleHealth('gemini');
@@ -85,28 +192,16 @@ export class PipelineWorker {
     this.sttRouter.register(new LocalWhisperProvider(whisperBin, whisperModelDir, this.config.sttModel));
     this.sttRouter.register(new SherpaOnnxSttProvider(sherpaModelDir));
 
-    // Cloud STT
-    if (this.config.groqApiKey) {
-      this.sttRouter.register(new GroqSttProvider(this.config.groqApiKey));
-    }
-    if (this.config.openaiApiKey) {
-      this.sttRouter.register(new OpenAiSttProvider(this.config.openaiApiKey));
-    }
-    if (this.config.geminiApiKey) {
-      this.sttRouter.register(new GeminiSttProvider(this.config.geminiApiKey));
-    }
+    // Cloud STT (always registered so health/selection can report "no key").
+    this.sttRouter.register(new GroqSttProvider(this.config.groqApiKey ?? ''));
+    this.sttRouter.register(new OpenAiSttProvider(this.config.openaiApiKey ?? ''));
+    this.sttRouter.register(new GeminiSttProvider(this.config.geminiApiKey ?? ''));
 
     // LLM providers
     this.llmRouter.register(new OllamaCorrectionProvider('http://127.0.0.1:11434', this.config.llmModel));
-    if (this.config.groqApiKey) {
-      this.llmRouter.register(new GroqLlmProvider(this.config.groqApiKey, this.config.llmModel));
-    }
-    if (this.config.openaiApiKey) {
-      this.llmRouter.register(new OpenAiLlmProvider(this.config.openaiApiKey, this.config.llmModel));
-    }
-    if (this.config.geminiApiKey) {
-      this.llmRouter.register(new GeminiLlmProvider(this.config.geminiApiKey, this.config.llmModel));
-    }
+    this.llmRouter.register(new GroqLlmProvider(this.config.groqApiKey ?? '', this.config.llmModel));
+    this.llmRouter.register(new OpenAiLlmProvider(this.config.openaiApiKey ?? '', this.config.llmModel));
+    this.llmRouter.register(new GeminiLlmProvider(this.config.geminiApiKey ?? '', this.config.llmModel));
   }
 
   private setActive(): void {
@@ -201,5 +296,28 @@ export class PipelineWorker {
   private simpleHealth(key: 'groq' | 'openai' | 'gemini'): { ok: boolean; message: string } {
     const keyConfig = key === 'groq' ? this.config.groqApiKey : key === 'openai' ? this.config.openaiApiKey : this.config.geminiApiKey;
     return keyConfig ? { ok: true, message: 'Configured' } : { ok: false, message: 'API key not set' };
+  }
+
+  /**
+   * Real connectivity check: local providers by config, cloud providers by an
+   * actual API call against their /models endpoint using the configured key.
+   */
+  async checkSttHealth(): Promise<Record<STTProvider, { ok: boolean; message: string }>> {
+    const result = this.getSttHealth();
+    for (const id of ['groq', 'openai', 'gemini'] as STTProvider[]) {
+      const provider = this.sttRouter.getProvider(id);
+      if (provider) result[id] = await provider.check();
+    }
+    return result;
+  }
+
+  /** Real connectivity check for the LLM providers (cloud providers). */
+  async checkLlmHealth(): Promise<Record<LLMProvider, { ok: boolean; message: string }>> {
+    const result = this.getLlmHealth();
+    for (const id of ['groq', 'openai', 'gemini'] as LLMProvider[]) {
+      const provider = this.llmRouter.getProvider(id);
+      if (provider) result[id] = await provider.check();
+    }
+    return result;
   }
 }

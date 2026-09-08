@@ -1,6 +1,40 @@
 import { describe, it, expect } from 'vitest';
 import { correctionResultSchema } from '@speakright/shared';
-import { parseCorrectionResult } from '@speakright/correction';
+import { parseCorrectionResult, buildCorrectionSchema, buildCorrectionResponseFormat } from '@speakright/correction';
+
+/** Every object node must forbid additional props and require all its properties. */
+function assertStrictCompliant(node: unknown): void {
+  if (typeof node !== 'object' || node === null) return;
+  if (Array.isArray(node)) {
+    node.forEach(assertStrictCompliant);
+    return;
+  }
+  const obj = node as Record<string, unknown>;
+  if ('properties' in obj) {
+    const props = Object.keys(obj.properties as Record<string, unknown>);
+    expect(obj.additionalProperties).toBe(false);
+    expect(obj.required).toEqual(expect.arrayContaining(props));
+  }
+  Object.values(obj).forEach(assertStrictCompliant);
+}
+
+/**
+ * Regression test for the Groq 400: "additionalProperties:false must be set on
+ * every object". Strict json_schema mode requires it recursively, incl. nested
+ * objects such as issues.items.
+ */
+describe('correction JSON schema (strict mode)', () => {
+  it('is strict-mode compliant at every nesting level', () => {
+    expect(() => assertStrictCompliant(buildCorrectionSchema())).not.toThrow();
+  });
+
+  it('builds a strict json_schema response_format', () => {
+    const fmt = buildCorrectionResponseFormat();
+    expect(fmt.type).toBe('json_schema');
+    expect((fmt.json_schema as { strict: boolean }).strict).toBe(true);
+    expect(() => assertStrictCompliant((fmt.json_schema as { schema: unknown }).schema)).not.toThrow();
+  });
+});
 
 describe('correctionResultSchema', () => {
   it('accepts a valid correction result', () => {

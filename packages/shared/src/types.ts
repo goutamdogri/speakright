@@ -10,6 +10,20 @@ export type Confidence = 'high' | 'medium' | 'low';
 
 export type STTProvider = 'local-whisper' | 'sherpa-onnx' | 'groq' | 'openai' | 'gemini';
 export type LLMProvider = 'ollama' | 'groq' | 'openai' | 'gemini';
+/** Providers that authenticate to a cloud API with an API key. */
+export type CloudProvider = 'groq' | 'openai' | 'gemini';
+
+export type SecretSource = 'keychain' | 'env' | 'memory' | 'none';
+
+/**
+ * What the renderer (UI) may know about a stored credential — never the
+ * credential itself. `masked` shows only the last 4 characters.
+ */
+export interface SecretStatus {
+  configured: boolean;
+  source: SecretSource;
+  masked?: string;
+}
 
 export interface Transcript {
   text: string;

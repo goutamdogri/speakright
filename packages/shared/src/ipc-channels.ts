@@ -43,6 +43,14 @@ export const IPC = {
   CHECK_PROVIDERS: 'health:check',
   PROVIDER_UNAVAILABLE: 'health:provider-unavailable',
 
+  // Cloud credentials (main-only; renderer never receives raw keys)
+  GET_SECRETS_STATUS: 'secrets:get-status',
+  SET_SECRET: 'secrets:set',
+  CLEAR_SECRET: 'secrets:clear',
+
+  // Provider model catalogs (resolved in main using the configured key)
+  LIST_MODELS: 'models:list',
+
   // Sessions
   START_SESSION: 'session:start',
   END_SESSION: 'session:end',

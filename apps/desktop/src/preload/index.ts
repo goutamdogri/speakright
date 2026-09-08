@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC } from '@speakright/shared';
-import type { AppSettings, ListeningState, PipelineStatus } from '@speakright/shared';
+import type { AppSettings, CloudProvider, ListeningState, PipelineStatus, SecretStatus } from '@speakright/shared';
 
 /**
  * Exposes a minimal, safe API surface to renderers.
@@ -74,6 +74,21 @@ const api = {
 
   // Provider health
   checkProviders: () => ipcRenderer.invoke(IPC.CHECK_PROVIDERS),
+
+  // Cloud credentials — the renderer can set/clear a key and read its status,
+  // but never retrieve the raw key itself.
+  getSecretStatuses: () =>
+    ipcRenderer.invoke(IPC.GET_SECRETS_STATUS) as Promise<{
+      canPersist: boolean;
+      secrets: Record<string, SecretStatus>;
+    }>,
+  setSecret: (provider: CloudProvider, key: string) =>
+    ipcRenderer.invoke(IPC.SET_SECRET, provider, key) as Promise<SecretStatus>,
+  clearSecret: (provider: CloudProvider) =>
+    ipcRenderer.invoke(IPC.CLEAR_SECRET, provider) as Promise<SecretStatus>,
+
+  // Model catalog for the currently selected STT/LLM providers.
+  listModels: (kind: 'stt' | 'llm') => ipcRenderer.invoke(IPC.LIST_MODELS, kind) as Promise<string[]>,
 };
 
 contextBridge.exposeInMainWorld('speakright', api);

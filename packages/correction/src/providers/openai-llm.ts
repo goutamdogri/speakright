@@ -1,6 +1,8 @@
 import type { CorrectionProvider, CorrectionInput } from '../types.js';
 import type { CorrectionResult, LLMProvider } from '@speakright/shared';
 import { buildCorrectionPrompt, parseCorrectionResult } from '../prompt-builder.js';
+import { buildCorrectionResponseFormat } from '../prompt-builder.js';
+import { fetchOpenAiLikeModels } from '../model-lists.js';
 
 /**
  * OpenAI LLM adapter — uses structured JSON output via the Responses API.
@@ -34,39 +36,7 @@ export class OpenAiLlmProvider implements CorrectionProvider {
           { role: 'user', content: prompt },
         ],
         temperature: 0.3,
-        response_format: {
-          type: 'json_schema',
-          json_schema: {
-            name: 'correction_result',
-            strict: true,
-            schema: {
-              type: 'object',
-              properties: {
-                original: { type: 'string' },
-                corrected: { type: 'string' },
-                has_correction: { type: 'boolean' },
-                confidence: { type: 'number' },
-                issues: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      type: { type: 'string' },
-                      subtype: { type: 'string' },
-                      original: { type: 'string' },
-                      correction: { type: 'string' },
-                      explanation: { type: 'string' },
-                    },
-                    required: ['type', 'subtype', 'original', 'correction', 'explanation'],
-                  },
-                },
-                better_formation: { type: 'string' },
-                severity: { type: 'string' },
-              },
-              required: ['original', 'corrected', 'has_correction', 'confidence', 'issues', 'severity'],
-            },
-          },
-        },
+        response_format: buildCorrectionResponseFormat(),
       }),
     });
 
@@ -96,6 +66,12 @@ export class OpenAiLlmProvider implements CorrectionProvider {
   }
 
   async listModels(): Promise<string[]> {
-    return ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'];
+    const EXCLUDE = /whisper|transcribe|embedding|tts|audio|dall|\bsearch\b|moderation/i;
+    return fetchOpenAiLikeModels(
+      'https://api.openai.com/v1',
+      this.apiKey,
+      id => !EXCLUDE.test(id),
+      ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini'],
+    );
   }
 }

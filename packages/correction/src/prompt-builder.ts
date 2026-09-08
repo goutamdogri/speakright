@@ -60,6 +60,55 @@ export function buildCorrectionPrompt(transcript: string, context?: string[]): s
   return prompt;
 }
 
+/**
+ * Strict-mode JSON schema for the correction result (OpenAI / Groq
+ * `json_schema` response_format). Strict mode requires `additionalProperties:
+ * false` on every object and every property listed in `required` — Groq rejects
+ * schemas that omit these on nested objects (e.g. `issues.items`).
+ */
+export function buildCorrectionSchema(): Record<string, unknown> {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      original: { type: 'string' },
+      corrected: { type: 'string' },
+      has_correction: { type: 'boolean' },
+      confidence: { type: 'number' },
+      issues: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            type: { type: 'string' },
+            subtype: { type: 'string' },
+            original: { type: 'string' },
+            correction: { type: 'string' },
+            explanation: { type: 'string' },
+          },
+          required: ['type', 'subtype', 'original', 'correction', 'explanation'],
+        },
+      },
+      better_formation: { type: 'string' },
+      severity: { type: 'string' },
+    },
+    required: ['original', 'corrected', 'has_correction', 'confidence', 'issues', 'better_formation', 'severity'],
+  };
+}
+
+/** Ready-to-send `response_format` for structured output (OpenAI / Groq). */
+export function buildCorrectionResponseFormat(): Record<string, unknown> {
+  return {
+    type: 'json_schema',
+    json_schema: {
+      name: 'correction_result',
+      strict: true,
+      schema: buildCorrectionSchema(),
+    },
+  };
+}
+
 export function parseCorrectionResult(raw: string): CorrectionResult {
   // Strip markdown fences if present
   let cleaned = raw.trim();

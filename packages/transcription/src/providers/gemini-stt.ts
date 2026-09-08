@@ -1,6 +1,7 @@
 import type { SpeechToTextProvider, TranscriptionOptions } from '../types.js';
 import type { Transcript, STTProvider } from '@speakright/shared';
 import { toBase64 } from '../audio-utils.js';
+import { fetchGeminiModels } from '../model-lists.js';
 
 /**
  * Gemini STT adapter — uses Gemini's generateContent API with inline audio
@@ -84,6 +85,6 @@ export class GeminiSttProvider implements SpeechToTextProvider {
   }
 
   async listModels(): Promise<string[]> {
-    return ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-2.5-flash'];
+    return fetchGeminiModels(this.apiKey, ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro']);
   }
 }

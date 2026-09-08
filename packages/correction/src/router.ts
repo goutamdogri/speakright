@@ -22,6 +22,10 @@ export class CorrectionRouter {
     this.providers.set(provider.id, provider);
   }
 
+  getProvider(id: LLMProvider): CorrectionProvider | null {
+    return this.providers.get(id) ?? null;
+  }
+
   unregister(id: LLMProvider): void {
     this.providers.delete(id);
   }

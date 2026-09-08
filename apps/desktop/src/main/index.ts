@@ -1,8 +1,10 @@
 import { app, BrowserWindow, Menu, ipcMain } from 'electron';
 import { join } from 'node:path';
 import { IPC } from '@speakright/shared';
-import type { AppSettings } from '@speakright/shared';
+import type { AppSettings, CloudProvider, SecretStatus } from '@speakright/shared';
+import { SecretManager, EnvSecretStore } from '@speakright/secrets';
 import { PipelineController } from './pipeline-controller.js';
+import { SafeStorageCredentialStore, canUseKeychain } from './secrets/safe-storage-credential-store.js';
 
 // GPU hardware acceleration fails on many Linux/VM setups (missing/unsupported
 // GPU process). The overlay must stay cheap and reliable, so software raster
@@ -25,6 +27,7 @@ export interface AppContext {
   pipeline: PipelineController;
   tray: TrayController;
   hotkeys: HotkeyManager;
+  secrets: SecretManager;
 }
 
 let ctx: AppContext;
@@ -68,6 +71,24 @@ async function bootstrap(): Promise<void> {
   const utteranceRepo = new UtteranceRepository(db);
   const correctionRepo = new CorrectionRepository(db);
 
+  // Credentials: OS-keychain-encrypted (safeStorage) primary, .env fallback.
+  // Load a gitignored .env if present so SPEAKRIGHT_*_API_KEY works in dev.
+  loadDotEnv();
+  const keyringAvailable = canUseKeychain();
+  const secureStore = keyringAvailable ? new SafeStorageCredentialStore(new SettingsRepository(db)) : null;
+  const secrets = new SecretManager({
+    ...(secureStore ? { secureStore } : {}),
+    envStore: new EnvSecretStore(),
+  });
+  const getApiKey = (provider: CloudProvider): string | null => {
+    try {
+      return secrets.get(provider);
+    } catch {
+      return null;
+    }
+  };
+  console.log(`[Secrets] Keychain storage: ${keyringAvailable ? 'available (safeStorage)' : 'unavailable — using SPEAKRIGHT_* env/.env keys'}`);
+
   const overlay = new OverlayController(settings);
   const audioHost = new AudioHostController();
   const pipeline = new PipelineController({
@@ -76,6 +97,7 @@ async function bootstrap(): Promise<void> {
     utteranceRepo,
     correctionRepo,
     audioHost,
+    getApiKey,
     onCorrection: display => overlay.show(display),
     onLiveEvent: event => broadcastLive(IPC.LIVE_TRANSCRIPT, event),
   });
@@ -93,7 +115,7 @@ async function bootstrap(): Promise<void> {
     onToggleOverlay: () => overlay.toggle(),
   });
 
-  ctx = { settings, sessionRepo, utteranceRepo, correctionRepo, overlay, audioHost, pipeline, tray, hotkeys };
+  ctx = { settings, sessionRepo, utteranceRepo, correctionRepo, overlay, audioHost, pipeline, tray, hotkeys, secrets };
 
   registerIpcHandlers();
   hotkeys.registerAll();
@@ -109,6 +131,22 @@ async function bootstrap(): Promise<void> {
   );
 
   app.on('will-quit', () => hotkeys.unregisterAll());
+}
+
+/** Load a gitignored `.env` if present (no-op otherwise). */
+function loadDotEnv(): void {
+  // Node >= 20.12 (Electron 31 ships Node 20) — throws if the file is absent.
+  const candidates = [
+    join(app.getAppPath(), '.env'),
+    join(process.cwd(), '.env'),
+  ];
+  for (const file of candidates) {
+    try {
+      process.loadEnvFile?.(file);
+    } catch {
+      // Absent file — try the next candidate.
+    }
+  }
 }
 
 function createAppMenu(): void {
@@ -216,8 +254,44 @@ function registerIpcHandlers(): void {
     ctx.overlay.resize(width, height);
   });
 
-  // Provider health
-  ipcMain.handle(IPC.CHECK_PROVIDERS, () => ctx.pipeline.getSttHealth());
+  // Provider health (STT + LLM). Cloud providers are checked against their
+  // real API endpoints using the configured key.
+  ipcMain.handle(IPC.CHECK_PROVIDERS, async () => ({
+    stt: await ctx.pipeline.checkSttHealth(),
+    llm: await ctx.pipeline.checkLlmHealth(),
+  }));
+
+  // Cloud credentials (main-only). Renderers can set/clear, and read status —
+  // never the raw key.
+  ipcMain.handle(IPC.GET_SECRETS_STATUS, () => {
+    const result: Record<string, SecretStatus> = {};
+    for (const provider of ['groq', 'openai', 'gemini'] as CloudProvider[]) {
+      result[provider] = ctx.secrets.status(provider);
+    }
+    return { canPersist: ctx.secrets.canPersist(), secrets: result };
+  });
+
+  ipcMain.handle(IPC.SET_SECRET, (_e, provider: CloudProvider, key: string) => {
+    if (!['groq', 'openai', 'gemini'].includes(provider)) {
+      throw new Error(`Unknown provider: ${provider}`);
+    }
+    const value = String(key ?? '').trim();
+    if (!value) throw new Error('API key cannot be empty');
+    ctx.secrets.set(provider, value);
+    ctx.pipeline.notifySettingsChanged();
+    return ctx.secrets.status(provider);
+  });
+
+  ipcMain.handle(IPC.CLEAR_SECRET, (_e, provider: CloudProvider) => {
+    ctx.secrets.clear(provider);
+    ctx.pipeline.notifySettingsChanged();
+    return ctx.secrets.status(provider);
+  });
+
+  // Model catalogs for the currently selected STT/LLM providers.
+  ipcMain.handle(IPC.LIST_MODELS, (_e, kind: 'stt' | 'llm') => {
+    return kind === 'llm' ? ctx.pipeline.listLlmModels() : ctx.pipeline.listSttModels();
+  });
 }
 
 app.whenReady().then(() => {

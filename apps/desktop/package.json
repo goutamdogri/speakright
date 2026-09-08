@@ -16,6 +16,7 @@
     "@speakright/correction": "workspace:*",
     "@speakright/database": "workspace:*",
     "@speakright/queue": "workspace:*",
+    "@speakright/secrets": "workspace:*",
     "@speakright/settings": "workspace:*",
     "@speakright/shared": "workspace:*",
     "@speakright/transcription": "workspace:*"

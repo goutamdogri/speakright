@@ -1,6 +1,7 @@
 import type { SpeechToTextProvider, TranscriptionOptions } from '../types.js';
 import type { Transcript, STTProvider } from '@speakright/shared';
 import { pcmToWavBlob } from '../audio-utils.js';
+import { fetchOpenAiLikeModels } from '../model-lists.js';
 
 /**
  * Groq STT adapter — uses OpenAI-compatible whisper endpoint.
@@ -65,6 +66,11 @@ export class GroqSttProvider implements SpeechToTextProvider {
   }
 
   async listModels(): Promise<string[]> {
-    return ['whisper-large-v3-turbo', 'whisper-large-v3'];
+    return fetchOpenAiLikeModels(
+      this.baseUrl,
+      this.apiKey,
+      id => id.toLowerCase().includes('whisper'),
+      ['whisper-large-v3-turbo', 'whisper-large-v3'],
+    );
   }
 }

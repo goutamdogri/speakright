@@ -1,6 +1,7 @@
 import type { CorrectionProvider, CorrectionInput } from '../types.js';
 import type { CorrectionResult, LLMProvider } from '@speakright/shared';
 import { buildCorrectionPrompt, parseCorrectionResult } from '../prompt-builder.js';
+import { fetchGeminiModels } from '../model-lists.js';
 
 /**
  * Gemini LLM adapter — uses generateContent API with responseSchema.
@@ -88,6 +89,6 @@ export class GeminiLlmProvider implements CorrectionProvider {
   }
 
   async listModels(): Promise<string[]> {
-    return ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-2.5-flash'];
+    return fetchGeminiModels(this.apiKey, ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro']);
   }
 }

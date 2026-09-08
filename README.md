@@ -42,6 +42,8 @@ packages/
   database/                   better-sqlite3 connection + migrations + repositories
                               (sessions, utterances, corrections, history, settings)
   settings/                   Typed settings manager with defaults + validation
+  secrets/                    Provider API-key stores (env fallback), abstracted
+                              so the app main process can add OS-keychain storage
 scripts/
   download-whisper-model.sh   Fetch ggml-base/small/medium.en.bin models
   run-integration.sh          Electron-based integration/E2E test runner
@@ -120,9 +122,30 @@ ollama pull llama3.1
 | `SPEAKRIGHT_WHISPER_BIN` | Override whisper-cli path                     |
 | `SPEAKRIGHT_WHISPER_DIR` | Model directory (default `~/.local/share/speakright/whisper`) |
 | `SPEAKRIGHT_TEST_AUDIO`  | Raw 16 kHz mono PCM file for the E2E test     |
+| `SPEAKRIGHT_GROQ_API_KEY` | Groq API key used by Groq STT + LLM           |
+| `SPEAKRIGHT_OPENAI_API_KEY` | OpenAI API key used by OpenAI STT + LLM     |
+| `SPEAKRIGHT_GEMINI_API_KEY` | Google Gemini API key used by Gemini STT + LLM |
 
-API keys for Groq/Gemini/OpenAI (if you enable those providers) are set inside
-the app's Settings UI and stored via the settings repository.
+### Security & API keys
+
+Cloud providers (Groq, Gemini, OpenAI) need an API key, configured in
+**Settings → Providers**. Keys are handled only in the Electron main process:
+
+- **Saved in the UI** → encrypted at rest with the OS keychain via Electron
+  `safeStorage` (libsecret on Linux, Keychain on macOS, DPAPI on Windows), then
+  stored as ciphertext in SQLite. The renderer only ever sees a masked preview
+  (e.g. `…k3m`) and a status badge.
+- **No OS keyring** (common on minimal Linux installs) → saved keys are refused
+  and the app falls back to environment variables / a gitignored `.env` file.
+  Copy [`apps/desktop/.env.example`](apps/desktop/.env.example) to `.env` and
+  set `SPEAKRIGHT_GROQ_API_KEY`, `SPEAKRIGHT_OPENAI_API_KEY` and/or
+  `SPEAKRIGHT_GEMINI_API_KEY`.
+- Model dropdowns are populated live from each provider's `/models` endpoint
+  (resolved in the main process with the configured key); they fall back to a
+  curated list when offline or unauth'd.
+- A key saved in the UI takes precedence over the same provider's `.env` value.
+
+**Never commit a real `.env`** — only `.env.example` is tracked.
 
 ---
 

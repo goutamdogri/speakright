@@ -1,6 +1,8 @@
 import type { CorrectionProvider, CorrectionInput } from '../types.js';
 import type { CorrectionResult, LLMProvider } from '@speakright/shared';
 import { buildCorrectionPrompt, parseCorrectionResult } from '../prompt-builder.js';
+import { buildCorrectionResponseFormat } from '../prompt-builder.js';
+import { fetchOpenAiLikeModels } from '../model-lists.js';
 
 /**
  * Groq LLM adapter — uses OpenAI-compatible chat completions.
@@ -15,7 +17,7 @@ export class GroqLlmProvider implements CorrectionProvider {
   private readonly apiKey: string;
   private readonly defaultModel: string;
 
-  constructor(apiKey: string, defaultModel = 'llama-3.3-70b-versatile') {
+  constructor(apiKey: string, defaultModel = 'qwen/qwen3.6-27b') {
     this.apiKey = apiKey;
     this.defaultModel = defaultModel;
   }
@@ -36,39 +38,7 @@ export class GroqLlmProvider implements CorrectionProvider {
           { role: 'user', content: prompt },
         ],
         temperature: 0.3,
-        response_format: {
-          type: 'json_schema',
-          json_schema: {
-            name: 'correction_result',
-            strict: true,
-            schema: {
-              type: 'object',
-              properties: {
-                original: { type: 'string' },
-                corrected: { type: 'string' },
-                has_correction: { type: 'boolean' },
-                confidence: { type: 'number' },
-                issues: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      type: { type: 'string' },
-                      subtype: { type: 'string' },
-                      original: { type: 'string' },
-                      correction: { type: 'string' },
-                      explanation: { type: 'string' },
-                    },
-                    required: ['type', 'subtype', 'original', 'correction', 'explanation'],
-                  },
-                },
-                better_formation: { type: 'string' },
-                severity: { type: 'string' },
-              },
-              required: ['original', 'corrected', 'has_correction', 'confidence', 'issues', 'severity'],
-            },
-          },
-        },
+        response_format: buildCorrectionResponseFormat(),
       }),
     });
 
@@ -98,6 +68,20 @@ export class GroqLlmProvider implements CorrectionProvider {
   }
 
   async listModels(): Promise<string[]> {
-    return ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'llama-3.1-70b-versatile'];
+    // Exclude non-chat endpoints (speech-to-text, TTS, prompt-guard).
+    const EXCLUDE = /whisper|orpheus|prompt-guard/i;
+    return fetchOpenAiLikeModels(
+      'https://api.groq.com/openai/v1',
+      this.apiKey,
+      id => !EXCLUDE.test(id),
+      [
+        'qwen/qwen3.6-27b',
+        'qwen/qwen3.8-27b',
+        'groq/compound',
+        'groq/compound-mini',
+        'openai/gpt-oss-120b',
+        'openai/gpt-oss-20b',
+      ],
+    );
   }
 }
