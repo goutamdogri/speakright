@@ -38,6 +38,11 @@ export const IPC = {
   RESUME_QUEUE: 'overlay:resume-queue',
   OVERLAY_POSITION_CHANGED: 'overlay:position-changed',
   OVERLAY_RESIZE: 'overlay:resize',
+  /** Hide/show the overlay window without touching the pipeline or queue. */
+  OVERLAY_SET_VISIBLE: 'overlay:set-visible',
+  OVERLAY_GET_VISIBLE: 'overlay:get-visible',
+  /** Snapshot of the display queue (currently shown + pending corrections) for the UI. */
+  GET_QUEUE: 'overlay:get-queue',
 
   // Provider health
   CHECK_PROVIDERS: 'health:check',

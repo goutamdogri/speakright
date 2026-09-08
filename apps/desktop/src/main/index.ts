@@ -98,6 +98,7 @@ async function bootstrap(): Promise<void> {
     correctionRepo,
     audioHost,
     getApiKey,
+    isOverlayHidden: () => !overlay.isVisible(),
     onCorrection: display => overlay.show(display),
     onLiveEvent: event => broadcastLive(IPC.LIVE_TRANSCRIPT, event),
   });
@@ -112,7 +113,7 @@ async function bootstrap(): Promise<void> {
   const hotkeys = new HotkeyManager(settings, {
     onToggleListening: () => pipeline.toggleListening(),
     onPauseResume: () => pipeline.pauseResume(),
-    onToggleOverlay: () => overlay.toggle(),
+    onToggleOverlay: () => setOverlayVisible(!ctx.overlay?.isVisible()),
   });
 
   ctx = { settings, sessionRepo, utteranceRepo, correctionRepo, overlay, audioHost, pipeline, tray, hotkeys, secrets };
@@ -254,6 +255,13 @@ function registerIpcHandlers(): void {
     ctx.overlay.resize(width, height);
   });
 
+  // Hide/show the overlay. Hiding pauses the display queue so corrections
+  // accumulate and replay in order (with their full display duration) when the
+  // overlay is shown again; the listening pipeline and its queue keep running.
+  ipcMain.handle(IPC.OVERLAY_SET_VISIBLE, (_e, visible: boolean) => setOverlayVisible(Boolean(visible)));
+  ipcMain.handle(IPC.OVERLAY_GET_VISIBLE, () => ctx.overlay.isVisible());
+  ipcMain.handle(IPC.GET_QUEUE, () => ctx.pipeline.getQueueContent());
+
   // Provider health (STT + LLM). Cloud providers are checked against their
   // real API endpoints using the configured key.
   ipcMain.handle(IPC.CHECK_PROVIDERS, async () => ({
@@ -292,6 +300,14 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.LIST_MODELS, (_e, kind: 'stt' | 'llm') => {
     return kind === 'llm' ? ctx.pipeline.listLlmModels() : ctx.pipeline.listSttModels();
   });
+}
+
+/** Hide/show the overlay, pausing/resuming the display queue accordingly. */
+function setOverlayVisible(visible: boolean): boolean {
+  ctx.overlay.setVisible(visible);
+  if (visible) ctx.pipeline.resumeQueue();
+  else ctx.pipeline.pauseQueue();
+  return ctx.overlay.isVisible();
 }
 
 app.whenReady().then(() => {

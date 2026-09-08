@@ -110,4 +110,32 @@ describe('CorrectionQueue', () => {
     vi.advanceTimersByTime(10_000);
     expect(onShow).toHaveBeenCalledTimes(2);
   });
+
+  it('accumulates while paused and replays every item in order on resume', () => {
+    const onShow = vi.fn();
+    const queue = new CorrectionQueue({ displayDurationMs: 5_000 }, { onShow, onEmpty: vi.fn(), onAdvance: vi.fn() });
+
+    // Simulate the overlay being hidden: queue paused before any item arrives.
+    queue.pause();
+
+    for (let i = 1; i <= 4; i++) {
+      queue.enqueue(makeCorrection({ id: `chunk-${i}`, original: `original ${i}`, corrected: `corrected ${i}` }));
+    }
+
+    // Nothing delivered while "hidden".
+    expect(onShow).toHaveBeenCalledTimes(0);
+    expect(queue.queueLength).toBe(4);
+    expect(queue.pending.map(p => p.id)).toEqual(['chunk-1', 'chunk-2', 'chunk-3', 'chunk-4']);
+
+    // Reveal: resume → items play one at a time, each for the display duration.
+    queue.resume();
+    expect(onShow).toHaveBeenCalledTimes(1);
+    expect((onShow.mock.calls[0][0] as DisplayCorrection).id).toBe('chunk-1');
+
+    for (let i = 2; i <= 4; i++) {
+      vi.advanceTimersByTime(5_000);
+      expect(onShow).toHaveBeenCalledTimes(i);
+      expect((onShow.mock.calls[i - 1][0] as DisplayCorrection).id).toBe(`chunk-${i}`);
+    }
+  });
 });

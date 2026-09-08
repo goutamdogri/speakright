@@ -68,6 +68,11 @@ const api = {
   },
   resizeOverlay: (width: number, height: number) =>
     ipcRenderer.send(IPC.OVERLAY_RESIZE, width, height),
+  // Hide/show the overlay window only — the pipeline and queue keep running.
+  setOverlayVisible: (visible: boolean) =>
+    ipcRenderer.invoke(IPC.OVERLAY_SET_VISIBLE, visible) as Promise<boolean>,
+  getOverlayVisible: () => ipcRenderer.invoke(IPC.OVERLAY_GET_VISIBLE) as Promise<boolean>,
+  getQueue: () => ipcRenderer.invoke(IPC.GET_QUEUE),
 
   // Device enumeration
   getAudioDevices: () => ipcRenderer.invoke(IPC.GET_DEVICES) as Promise<any[]>,

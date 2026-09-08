@@ -26,6 +26,12 @@ export interface PipelineOptions {
   onCorrection: (display: DisplayCorrection) => void;
   onLiveEvent?: (event: PipelineLiveEvent) => void;
   /**
+   * Whether the always-on-top overlay window is currently hidden by the user.
+   * While hidden the display queue is kept paused so corrections accumulate in
+   * FIFO order and replay one by one when the overlay is shown again.
+   */
+  isOverlayHidden?: () => boolean;
+  /**
    * Resolves a cloud API key for a provider. Called in the main process only;
    * the resolved value is handed to the worker and never sent to a renderer.
    */
@@ -189,6 +195,30 @@ export class PipelineController {
     return this.listening;
   }
 
+  /**
+   * Pause/resume the display queue WITHOUT touching the listening state. Used
+   * when the overlay is hidden: the pipeline keeps listening and processing,
+   * but corrections accumulate in the queue and replay when it is resumed.
+   */
+  pauseQueue(): void {
+    this.queue.pause();
+  }
+
+  resumeQueue(): void {
+    // Don't start delivering while the overlay is still hidden.
+    if (this.options.isOverlayHidden?.()) return;
+    this.queue.resume();
+  }
+
+  /** Snapshot of the display queue for the UI. */
+  getQueueContent(): { state: string; current: DisplayCorrection | null; pending: DisplayCorrection[] } {
+    return {
+      state: this.queue.getState(),
+      current: this.queue.currentlyDisplayed,
+      pending: this.queue.pending,
+    };
+  }
+
   startListening(): ListeningState {
     if (this.listening === 'listening') return this.listening;
 
@@ -209,8 +239,9 @@ export class PipelineController {
     this.options.audioHost.start();
     // Resume/clear the display queue. After a stop() the queue is left paused,
     // so without this new corrections would sit in the queue and never reach the
-    // always-on-top overlay (issue #1).
-    this.queue.resume();
+    // always-on-top overlay (issue #1). When the overlay is hidden, stay paused
+    // so queued corrections replay on reveal instead of being discarded.
+    this.resumeQueue();
     return this.listenForStateChange('listening');
   }
 

@@ -7,7 +7,7 @@ import { HistoryView } from './components/HistoryList';
 import { GeneralSettings } from './components/GeneralSettings';
 import { CorrectionSettings } from './components/CorrectionSettings';
 
-type Tab = 'home' | 'general' | 'audio' | 'provider' | 'overlay' | 'correction' | 'history';
+type Tab = 'home' | 'queue' | 'general' | 'audio' | 'provider' | 'overlay' | 'correction' | 'history';
 
 declare global {
   interface Window {
@@ -60,6 +60,12 @@ export default function App() {
   const [health, setHealth] = useState<ProviderHealth | null>(null);
   const [speaking, setSpeaking] = useState(false);
   const [liveEvents, setLiveEvents] = useState<LiveEntry[]>([]);
+  const [overlayVisible, setOverlayVisible] = useState(true);
+  const [queueInfo, setQueueInfo] = useState<{
+    state: string;
+    current: { original: string; corrected?: string } | null;
+    pending: { original: string; corrected?: string }[];
+  }>({ state: 'empty', current: null, pending: [] });
 
   useEffect(() => {
     if (!window.speakright) {
@@ -78,6 +84,8 @@ export default function App() {
       setListening(st.listening);
     });
 
+    window.speakright.getOverlayVisible?.().then(setOverlayVisible);
+
     const unsub = window.speakright.onListeningState?.((state: ListeningState) => {
       setListening(state);
     });
@@ -94,7 +102,12 @@ export default function App() {
       if (ev.kind === 'speaking') setSpeaking(ev.value);
     });
 
-    return () => { unsub?.(); unsubLive?.(); unsubState?.(); };
+    // Poll the display queue so the Home tab reflects what's waiting to show.
+    const pollQueue = () => window.speakright.getQueue?.().then(setQueueInfo);
+    pollQueue();
+    const queueTimer = setInterval(pollQueue, 1000);
+
+    return () => { unsub?.(); unsubLive?.(); unsubState?.(); clearInterval(queueTimer); };
   }, []);
 
   const updateSettings = (patch: Partial<AppSettings>) => {
@@ -107,6 +120,10 @@ export default function App() {
     window.speakright.toggleListening().then(() => {
       window.speakright.getStatus().then((st: { listening: ListeningState }) => setListening(st.listening));
     });
+  };
+
+  const toggleOverlay = () => {
+    window.speakright.setOverlayVisible(!overlayVisible).then(setOverlayVisible);
   };
 
   const checkHealth = () => {
@@ -133,8 +150,9 @@ export default function App() {
 
   if (!settings) return null;
 
-  const tabs: { id: Tab; label: string }[] = [
+  const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: 'home', label: 'Home' },
+    { id: 'queue', label: 'Queue', count: queueInfo.pending.length + (queueInfo.current ? 1 : 0) },
     { id: 'general', label: 'General' },
     { id: 'audio', label: 'Audio' },
     { id: 'provider', label: 'Providers' },
@@ -165,6 +183,15 @@ export default function App() {
               }`}
             >
               {t.label}
+              {t.count !== undefined && t.count > 0 && (
+                <span
+                  className={`ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-[1.25rem] px-1 rounded-full text-[11px] font-semibold ${
+                    tab === t.id ? 'bg-white/25 text-white' : 'bg-blue-100 text-blue-700'
+                  }`}
+                >
+                  {t.count}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -178,18 +205,36 @@ export default function App() {
               <p className="text-sm text-slate-500 mb-4">
                 Speak into your microphone and corrections will appear in the overlay.
               </p>
-              <button
-                onClick={toggleListening}
-                className={`px-6 py-3 rounded-lg text-white font-medium text-sm transition-colors ${
-                  listening === 'listening'
-                    ? 'bg-red-600 hover:bg-red-700'
-                    : 'bg-green-600 hover:bg-green-700'
-                }`}
-              >
-                {listening === 'listening' ? 'Stop Listening' : 'Start Listening'}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={toggleListening}
+                  className={`px-6 py-3 rounded-lg text-white font-medium text-sm transition-colors ${
+                    listening === 'listening'
+                      ? 'bg-red-600 hover:bg-red-700'
+                      : 'bg-green-600 hover:bg-green-700'
+                  }`}
+                >
+                  {listening === 'listening' ? 'Stop Listening' : 'Start Listening'}
+                </button>
+                <button
+                  onClick={toggleOverlay}
+                  className={`px-6 py-3 rounded-lg font-medium text-sm transition-colors border ${
+                    overlayVisible
+                      ? 'text-slate-700 border-slate-300 hover:bg-slate-100'
+                      : 'text-blue-600 border-blue-300 bg-blue-50 hover:bg-blue-100'
+                  }`}
+                  title="Hides the always-on-top window without stopping listening or the queue"
+                >
+                  {overlayVisible ? 'Hide Overlay' : 'Show Overlay'}
+                </button>
+              </div>
               <p className="text-xs text-slate-400 mt-3">
                 Keyboard shortcut: {settings.hotkeys.toggleListening}
+                {!overlayVisible && (
+                  <span className="text-amber-600 block mt-1">
+                    Overlay hidden — listening and the queue continue; nothing is shown until you reveal it again.
+                  </span>
+                )}
               </p>
             </div>
 
@@ -265,6 +310,9 @@ export default function App() {
             </div>
           </div>
         )}
+        {tab === 'queue' && (
+          <QueueTab queueInfo={queueInfo} overlayVisible={overlayVisible} onToggleOverlay={toggleOverlay} />
+        )}
         {tab === 'general' && <GeneralSettings settings={settings} onUpdate={updateSettings} />}
         {tab === 'audio' && <AudioSettings settings={settings} onUpdate={updateSettings} />}
         {tab === 'provider' && <ProviderSettings settings={settings} onUpdate={updateSettings} />}
@@ -272,6 +320,66 @@ export default function App() {
         {tab === 'correction' && <CorrectionSettings settings={settings} onUpdate={updateSettings} />}
         {tab === 'history' && <HistoryView />}
       </main>
+    </div>
+  );
+}
+
+function QueueTab({ queueInfo, overlayVisible, onToggleOverlay }: {
+  queueInfo: { state: string; current: { original: string; corrected?: string } | null; pending: { original: string; corrected?: string }[] };
+  overlayVisible: boolean;
+  onToggleOverlay: () => void;
+}) {
+  const total = queueInfo.pending.length + (queueInfo.current ? 1 : 0);
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-lg border border-slate-200 p-6">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-sm font-semibold text-slate-700">Display queue</h2>
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
+            {total === 0 ? 'Empty' : `${total} item${total === 1 ? '' : 's'} in queue`}
+          </span>
+        </div>
+        <p className="text-xs text-slate-400 mb-4">
+          Corrections play one at a time here, each for its configured display duration. While the overlay is hidden the queue pauses, so everything spoken is still captured and replays in order when you show it again.
+        </p>
+        {!overlayVisible && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700 flex items-center justify-between gap-3">
+            <span>Overlay is hidden — the queue is paused and accumulating.</span>
+            <button onClick={onToggleOverlay} className="text-xs font-semibold text-amber-800 hover:text-amber-900 whitespace-nowrap">
+              Show Overlay
+            </button>
+          </div>
+        )}
+        {queueInfo.current || queueInfo.pending.length > 0 ? (
+          <div className="space-y-3">
+            {queueInfo.current && (
+              <QueueItem label="Now showing" item={queueInfo.current} highlight />
+            )}
+            {queueInfo.pending.map((item, i) => (
+              <QueueItem key={i} label={i === 0 ? 'Next' : `#${i + 1}`} item={item} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-sm text-slate-400 py-6 text-center border border-dashed border-slate-200 rounded-lg">
+            Nothing to display yet. Start listening and speak.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function QueueItem({ label, item, highlight }: { label: string; item: { original: string; corrected?: string }; highlight?: boolean }) {
+  const corrected = item.corrected && item.corrected !== item.original;
+  return (
+    <div className={`rounded-lg border px-3 py-2 ${highlight ? 'border-green-300 bg-green-50' : 'border-slate-200'}`}>
+      <div className={`text-[11px] font-semibold uppercase tracking-wide mb-1 ${highlight ? 'text-green-600' : 'text-slate-400'}`}>
+        {label}
+      </div>
+      <div className="text-sm text-slate-700 line-through decoration-red-400 decoration-1 leading-snug">{item.original}</div>
+      {corrected && (
+        <div className="text-sm font-medium text-green-700 mt-0.5 leading-snug">{item.corrected}</div>
+      )}
     </div>
   );
 }

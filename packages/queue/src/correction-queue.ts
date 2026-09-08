@@ -43,6 +43,11 @@ export class CorrectionQueue {
     return this.currentDisplay;
   }
 
+  /** A copy of the corrections queued behind the one currently displayed. */
+  get pending(): DisplayCorrection[] {
+    return [...this.items];
+  }
+
   /**
    * Enqueue a new correction result.
    * If the display is empty, show it immediately.

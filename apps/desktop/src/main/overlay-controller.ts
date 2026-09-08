@@ -13,7 +13,8 @@ export class OverlayController {
   private readonly settings: SettingsManager;
   private readonly position: { x: number; y: number } = { x: -1, y: -1 };
   private visible = false;
-
+  /** When true the overlay stays hidden but the pipeline/queue keep running. */
+  private suppressed = false;
   constructor(settings: SettingsManager) {
     this.settings = settings;
   }
@@ -71,6 +72,9 @@ export class OverlayController {
   }
 
   show(correction: DisplayCorrection): void {
+    // Note: while suppressed the display queue is paused, so corrections only
+    // arrive once the overlay is visible again (and replay in order).
+    if (this.suppressed) return;
     if (!this.win || this.win.isDestroyed()) return;
     this.win.showInactive();
     this.win.setIgnoreMouseEvents(true, { forward: true });
@@ -83,6 +87,28 @@ export class OverlayController {
     this.visible = false;
   }
 
+  /**
+   * Hide/show the overlay window. Hiding pauses the display queue (the caller
+   * is responsible for that), so corrections accumulate and replay in FIFO
+   * order, each for its full display duration, once the overlay is shown again.
+   */
+  setVisible(visible: boolean): void {
+    if (visible === !this.suppressed) return;
+    this.suppressed = !visible;
+    if (!visible) {
+      this.win?.hide();
+      this.visible = false;
+      return;
+    }
+    if (!this.win || this.win.isDestroyed()) return;
+    this.win.showInactive();
+    this.visible = true;
+  }
+
+  isVisible(): boolean {
+    return this.visible && !this.suppressed;
+  }
+
   /** Tell the overlay renderer the current listening state (to render an idle hint). */
   broadcastListening(state: ListeningState): void {
     if (!this.win || this.win.isDestroyed()) return;
@@ -90,11 +116,7 @@ export class OverlayController {
   }
 
   toggle(): void {
-    if (this.visible) this.hide();
-    else {
-      this.win?.showInactive();
-      this.visible = true;
-    }
+    this.setVisible(this.suppressed);
   }
 
   /** Auto-size the transparent window to fit its content (top-right anchor keeps height growing downward). */
