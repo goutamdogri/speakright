@@ -298,10 +298,15 @@ export class PipelineController {
     const provider = this.options.settings.getSection('provider');
     this.worker.updateProviders(this.resolveWorkerConfig(provider));
 
+    // Overlay + queue settings apply immediately (no restart needed): the timer
+    // of the correction currently on screen restarts with the new duration.
     const overlay = this.options.settings.getSection('overlay');
-    // Rebuild queue options (displayDurationMs can be changed at runtime).
-    // TODO: Make queue options mutable rather than recreating.
-    void overlay;
+    const correction = this.options.settings.getSection('correction');
+    this.queue.setOptions({
+      displayDurationMs: overlay.displayDurationMs,
+      maxItems: overlay.queueLimit,
+      confidenceThreshold: correction.confidenceThreshold,
+    });
   }
 
   private resolveWorkerConfig(provider = this.options.settings.getSection('provider')) {

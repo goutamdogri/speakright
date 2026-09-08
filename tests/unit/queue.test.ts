@@ -138,4 +138,22 @@ describe('CorrectionQueue', () => {
       expect((onShow.mock.calls[i - 1][0] as DisplayCorrection).id).toBe(`chunk-${i}`);
     }
   });
+
+  it('applies a new display duration immediately to the current item via setOptions', () => {
+    const onShow = vi.fn();
+    const queue = new CorrectionQueue({ displayDurationMs: 10_000 }, { onShow, onEmpty: vi.fn(), onAdvance: vi.fn() });
+
+    queue.enqueue(makeCorrection({ id: 'a' }));
+    queue.enqueue(makeCorrection({ id: 'b' }));
+    expect(onShow).toHaveBeenCalledTimes(1);
+
+    // Change the display duration at runtime (e.g. from Settings without restart).
+    queue.setOptions({ displayDurationMs: 2_000 });
+
+    // With the old 10s duration, 'a' would not advance at 3s; with the new 2s
+    // it already has.
+    vi.advanceTimersByTime(2_000);
+    expect(onShow).toHaveBeenCalledTimes(2);
+    expect((onShow.mock.calls[1][0] as DisplayCorrection).id).toBe('b');
+  });
 });

@@ -18,7 +18,7 @@ const DEFAULT_OPTIONS: CorrectionQueueOptions = {
  */
 export class CorrectionQueue {
   private readonly items: DisplayCorrection[] = [];
-  private readonly options: CorrectionQueueOptions;
+  private options: CorrectionQueueOptions;
   private readonly callbacks: CorrectionQueueCallbacks;
   private state: QueueState = 'empty';
   private displayTimer: ReturnType<typeof setTimeout> | null = null;
@@ -46,6 +46,25 @@ export class CorrectionQueue {
   /** A copy of the corrections queued behind the one currently displayed. */
   get pending(): DisplayCorrection[] {
     return [...this.items];
+  }
+
+  /**
+   * Update queue options at runtime. If `displayDurationMs` changes while an
+   * item is on screen, its timer restarts so the new duration applies to the
+   * currently displayed correction immediately (no restart required).
+   */
+  setOptions(patch: Partial<CorrectionQueueOptions>): void {
+    const durationChanged =
+      patch.displayDurationMs !== undefined &&
+      patch.displayDurationMs !== this.options.displayDurationMs;
+    Object.assign(this.options, patch);
+    if (durationChanged && this.displayTimer !== null && this.state === 'showing') {
+      clearTimeout(this.displayTimer);
+      this.displayTimer = setTimeout(() => {
+        this.displayTimer = null;
+        this.showNext();
+      }, this.options.displayDurationMs);
+    }
   }
 
   /**
