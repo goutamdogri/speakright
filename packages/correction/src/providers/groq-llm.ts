@@ -1,7 +1,7 @@
 import type { CorrectionProvider, CorrectionInput } from '../types.js';
 import type { CorrectionResult, LLMProvider } from '@speakright/shared';
 import { buildCorrectionPrompt, parseCorrectionResult } from '../prompt-builder.js';
-import { buildCorrectionResponseFormat } from '../prompt-builder.js';
+import { buildCorrectionResponseFormat, CORRECTION_SYSTEM_PROMPT } from '../prompt-builder.js';
 import { fetchOpenAiLikeModels } from '../model-lists.js';
 
 /**
@@ -16,10 +16,12 @@ export class GroqLlmProvider implements CorrectionProvider {
 
   private readonly apiKey: string;
   private readonly defaultModel: string;
+  private readonly systemPrompt: string;
 
-  constructor(apiKey: string, defaultModel = 'qwen/qwen3.6-27b') {
+  constructor(apiKey: string, defaultModel = 'qwen/qwen3.6-27b', systemPrompt = CORRECTION_SYSTEM_PROMPT) {
     this.apiKey = apiKey;
     this.defaultModel = defaultModel;
+    this.systemPrompt = systemPrompt;
   }
 
   async correct(input: CorrectionInput): Promise<CorrectionResult> {
@@ -35,6 +37,7 @@ export class GroqLlmProvider implements CorrectionProvider {
       body: JSON.stringify({
         model,
         messages: [
+          { role: 'system', content: this.systemPrompt },
           { role: 'user', content: prompt },
         ],
         temperature: 0.3,

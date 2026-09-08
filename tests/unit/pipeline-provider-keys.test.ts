@@ -69,6 +69,33 @@ describe('PipelineWorker API-key propagation (issue: 401 on transcribe)', () => 
     expect(after).not.toBe(before);
     expect((after as any).apiKey).toBe('sk-test-openai');
   });
+
+  it('sends a newly applied correction prompt to the LLM provider', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ data: [{ id: 'qwen/qwen3.6-27b' }, { id: 'openai/gpt-oss-120b' }] }),
+    })) as any);
+
+    const controller = await buildController();
+    const worker = (controller as any).worker;
+
+    worker.updateProviders({
+      llmProvider: 'groq',
+      llmModel: 'qwen/qwen3.6-27b',
+      groqApiKey: 'sk-test',
+      llmPrompt: 'ROLE A',
+    });
+
+    const before = worker.llmRouter.getProvider('groq');
+    expect((before as any).systemPrompt).toBe('ROLE A');
+
+    // Editing the prompt alone must rebuild providers so the new text is used.
+    worker.updateProviders({ llmPrompt: 'ROLE B' });
+
+    const after = worker.llmRouter.getProvider('groq');
+    expect(after).not.toBe(before);
+    expect((after as any).systemPrompt).toBe('ROLE B');
+  });
 });
 
 /**

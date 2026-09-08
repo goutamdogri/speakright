@@ -1,4 +1,5 @@
 import type { AppSettings } from '@speakright/shared';
+import { DEFAULT_CORRECTION_PROMPT } from '@speakright/shared';
 
 /**
  * Default application settings. These are the baseline values used
@@ -20,6 +21,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     sttModel: 'base',
     llm: 'ollama',
     llmModel: 'llama3.1',
+    llmPrompt: DEFAULT_CORRECTION_PROMPT,
     useLocalOnly: true,
     contextWindowSize: 3,
   },

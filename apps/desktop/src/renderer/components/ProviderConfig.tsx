@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Section, Field, inputCls } from './GeneralSettings';
 import type { AppSettings, CloudProvider, SecretStatus } from '@speakright/shared';
+import { DEFAULT_CORRECTION_PROMPT } from '@speakright/shared';
 
 interface Props {
   settings: AppSettings;
@@ -24,6 +25,60 @@ const LLM_OPTIONS = [
 
 const WHISPER_MODEL_OPTIONS = ['base', 'small', 'medium', 'large'] as const;
 const CLOUD_PROVIDERS: CloudProvider[] = ['groq', 'openai', 'gemini'];
+
+/** Editable system prompt for the LLM correction task. */
+function CorrectionPromptSection({ promptValue, onApply }: { promptValue: string; onApply: (value: string) => void }) {
+  const [draft, setDraft] = useState(promptValue);
+  const [saved, setSaved] = useState(false);
+
+  // Sync the draft when the prompt changes from elsewhere (restore, load).
+  useEffect(() => { setDraft(promptValue); }, [promptValue]);
+
+  const apply = (value: string) => {
+    onApply(value);
+    setDraft(value);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const isCustom = promptValue !== DEFAULT_CORRECTION_PROMPT;
+
+  return (
+    <Section title="LLM Correction Prompt">
+      <p className="text-xs text-slate-500 -mt-2 mb-2">
+        System prompt sent to the active LLM provider on every correction. Edits apply immediately to the next
+        correction — no restart required. Restore to go back to the built-in English-coach prompt.
+      </p>
+      <Field label="System prompt">
+        <textarea
+          className={`${inputCls} resize-y min-h-[220px] font-mono text-xs leading-relaxed`}
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          spellCheck={false}
+        />
+      </Field>
+      <div className="flex items-center gap-2 mt-1">
+        <button
+          type="button"
+          disabled={draft === promptValue}
+          onClick={() => apply(draft)}
+          className="px-3 py-2 rounded-md text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40"
+        >
+          Apply &amp; save
+        </button>
+        <button
+          type="button"
+          disabled={!isCustom && draft === DEFAULT_CORRECTION_PROMPT}
+          onClick={() => apply(DEFAULT_CORRECTION_PROMPT)}
+          className="px-3 py-2 rounded-md text-sm text-slate-700 border border-slate-300 hover:bg-slate-100 disabled:opacity-40"
+        >
+          Restore default
+        </button>
+        {saved && <span className="text-xs text-green-600">Saved — active immediately.</span>}
+      </div>
+    </Section>
+  );
+}
 
 const DEFAULT_STT_MODEL: Record<string, string> = {
   'local-whisper': 'base',
@@ -336,6 +391,11 @@ export function ProviderSettings({ settings, onUpdate }: Props) {
             : 'Cloud LLM sends your transcript to an external service. Configure the API key below; keys are encrypted at rest.'}
         </p>
       </Section>
+
+      <CorrectionPromptSection
+        promptValue={provider.llmPrompt}
+        onApply={value => onUpdate({ provider: { ...provider, llmPrompt: value } })}
+      />
 
       <Section title="Context & Privacy">
         <Field label="Conversational context window (utterances)">

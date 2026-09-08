@@ -1,7 +1,7 @@
 import type { CorrectionProvider, CorrectionInput } from '../types.js';
 import type { CorrectionResult, LLMProvider } from '@speakright/shared';
 import { buildCorrectionPrompt, parseCorrectionResult } from '../prompt-builder.js';
-import { buildCorrectionResponseFormat } from '../prompt-builder.js';
+import { buildCorrectionResponseFormat, CORRECTION_SYSTEM_PROMPT } from '../prompt-builder.js';
 import { fetchOpenAiLikeModels } from '../model-lists.js';
 
 /**
@@ -15,10 +15,12 @@ export class OpenAiLlmProvider implements CorrectionProvider {
 
   private readonly apiKey: string;
   private readonly defaultModel: string;
+  private readonly systemPrompt: string;
 
-  constructor(apiKey: string, defaultModel = 'gpt-4o-mini') {
+  constructor(apiKey: string, defaultModel = 'gpt-4o-mini', systemPrompt = CORRECTION_SYSTEM_PROMPT) {
     this.apiKey = apiKey;
     this.defaultModel = defaultModel;
+    this.systemPrompt = systemPrompt;
   }
 
   async correct(input: CorrectionInput): Promise<CorrectionResult> {
@@ -33,6 +35,7 @@ export class OpenAiLlmProvider implements CorrectionProvider {
       body: JSON.stringify({
         model: this.defaultModel,
         messages: [
+          { role: 'system', content: this.systemPrompt },
           { role: 'user', content: prompt },
         ],
         temperature: 0.3,

@@ -1,6 +1,6 @@
 import type { CorrectionProvider, CorrectionInput } from '../types.js';
 import type { CorrectionResult, LLMProvider } from '@speakright/shared';
-import { buildCorrectionPrompt, parseCorrectionResult } from '../prompt-builder.js';
+import { buildCorrectionPrompt, parseCorrectionResult, CORRECTION_SYSTEM_PROMPT } from '../prompt-builder.js';
 import { fetchGeminiModels } from '../model-lists.js';
 
 /**
@@ -14,10 +14,12 @@ export class GeminiLlmProvider implements CorrectionProvider {
 
   private readonly apiKey: string;
   private readonly defaultModel: string;
+  private readonly systemPrompt: string;
 
-  constructor(apiKey: string, defaultModel = 'gemini-2.0-flash') {
+  constructor(apiKey: string, defaultModel = 'gemini-2.5-flash', systemPrompt = CORRECTION_SYSTEM_PROMPT) {
     this.apiKey = apiKey;
     this.defaultModel = defaultModel;
+    this.systemPrompt = systemPrompt;
   }
 
   async correct(input: CorrectionInput): Promise<CorrectionResult> {
@@ -29,6 +31,7 @@ export class GeminiLlmProvider implements CorrectionProvider {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          systemInstruction: { parts: [{ text: this.systemPrompt }] },
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.3,

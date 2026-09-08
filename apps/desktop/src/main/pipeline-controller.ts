@@ -279,6 +279,7 @@ export class PipelineController {
       sttModel: provider.sttModel,
       llmProvider: provider.llm,
       llmModel: provider.llmModel,
+      llmPrompt: provider.llmPrompt,
       groqApiKey: this.options.getApiKey?.('groq') ?? undefined,
       openaiApiKey: this.options.getApiKey?.('openai') ?? undefined,
       geminiApiKey: this.options.getApiKey?.('gemini') ?? undefined,

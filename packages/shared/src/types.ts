@@ -84,6 +84,8 @@ export interface ProviderSettings {
   sttModel: string;
   llm: LLMProvider;
   llmModel: string;
+  /** System prompt used for LLM corrections; default = DEFAULT_CORRECTION_PROMPT. */
+  llmPrompt: string;
   useLocalOnly: boolean;
   contextWindowSize: number;
 }

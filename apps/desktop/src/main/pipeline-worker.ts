@@ -21,6 +21,7 @@ export interface WorkerConfig {
   sttModel: string;
   llmProvider: LLMProvider;
   llmModel: string;
+  llmPrompt?: string;
   whisperBinPath?: string;
   whisperModelDir?: string;
   sherpaModelDir?: string;
@@ -60,7 +61,7 @@ export class PipelineWorker {
     // affecting providers (e.g. bare model-name switches) skip the rebuild to
     // avoid dropping the Sherpa recognizer cache.
     const relevant = [
-      'sttProvider', 'sttModel', 'llmProvider', 'llmModel',
+      'sttProvider', 'sttModel', 'llmProvider', 'llmModel', 'llmPrompt',
       'whisperBinPath', 'whisperModelDir', 'sherpaModelDir',
       'groqApiKey', 'openaiApiKey', 'geminiApiKey',
     ] as const;
@@ -198,10 +199,10 @@ export class PipelineWorker {
     this.sttRouter.register(new GeminiSttProvider(this.config.geminiApiKey ?? ''));
 
     // LLM providers
-    this.llmRouter.register(new OllamaCorrectionProvider('http://127.0.0.1:11434', this.config.llmModel));
-    this.llmRouter.register(new GroqLlmProvider(this.config.groqApiKey ?? '', this.config.llmModel));
-    this.llmRouter.register(new OpenAiLlmProvider(this.config.openaiApiKey ?? '', this.config.llmModel));
-    this.llmRouter.register(new GeminiLlmProvider(this.config.geminiApiKey ?? '', this.config.llmModel));
+    this.llmRouter.register(new OllamaCorrectionProvider('http://127.0.0.1:11434', this.config.llmModel, this.config.llmPrompt));
+    this.llmRouter.register(new GroqLlmProvider(this.config.groqApiKey ?? '', this.config.llmModel, this.config.llmPrompt));
+    this.llmRouter.register(new OpenAiLlmProvider(this.config.openaiApiKey ?? '', this.config.llmModel, this.config.llmPrompt));
+    this.llmRouter.register(new GeminiLlmProvider(this.config.geminiApiKey ?? '', this.config.llmModel, this.config.llmPrompt));
   }
 
   private setActive(): void {

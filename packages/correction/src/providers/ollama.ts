@@ -1,6 +1,6 @@
 import type { CorrectionProvider, CorrectionInput } from '../types.js';
 import type { CorrectionResult, LLMProvider } from '@speakright/shared';
-import { buildCorrectionPrompt, parseCorrectionResult } from '../prompt-builder.js';
+import { buildCorrectionPrompt, parseCorrectionResult, CORRECTION_SYSTEM_PROMPT } from '../prompt-builder.js';
 
 /**
  * Local Ollama correction provider.
@@ -17,11 +17,13 @@ export class OllamaCorrectionProvider implements CorrectionProvider {
 
   private readonly baseUrl: string;
   private readonly defaultModel: string;
+  private readonly systemPrompt: string;
   private ollamaClient: any = null;
 
-  constructor(baseUrl = 'http://127.0.0.1:11434', defaultModel = 'llama3.1') {
+  constructor(baseUrl = 'http://127.0.0.1:11434', defaultModel = 'llama3.1', systemPrompt = CORRECTION_SYSTEM_PROMPT) {
     this.baseUrl = baseUrl;
     this.defaultModel = defaultModel;
+    this.systemPrompt = systemPrompt;
   }
 
   private async getClient() {
@@ -34,14 +36,14 @@ export class OllamaCorrectionProvider implements CorrectionProvider {
 
   async correct(input: CorrectionInput): Promise<CorrectionResult> {
     const ollama = await this.getClient();
-    const systemPrompt = buildCorrectionPrompt(input.transcript, input.context);
+    const instruction = buildCorrectionPrompt(input.transcript, input.context);
     const model = this.defaultModel;
 
     const response = await ollama.chat({
       model,
       messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: input.transcript },
+        { role: 'system', content: this.systemPrompt },
+        { role: 'user', content: instruction },
       ],
       format: {
         type: 'object',
