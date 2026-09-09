@@ -52,6 +52,89 @@ function statusDot(state: ListeningState): string {
   }
 }
 
+function NavGlyph({ children }: { children: ReactNode }) {
+  return (
+    <svg
+      width={15}
+      height={15}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  );
+}
+
+const navIcons: Record<Tab, ReactNode> = {
+  home: (
+    <NavGlyph>
+      <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+      <path d="M9 22V12h6v10" />
+    </NavGlyph>
+  ),
+  queue: (
+    <NavGlyph>
+      <path d="M9 6h10" />
+      <path d="M9 12h10" />
+      <path d="M9 18h10" />
+      <path d="M4 6h.01M4 12h.01M4 18h.01" />
+    </NavGlyph>
+  ),
+  history: (
+    <NavGlyph>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </NavGlyph>
+  ),
+  general: (
+    <NavGlyph>
+      <path d="M4 21v-7" />
+      <path d="M4 10V3" />
+      <path d="M12 21v-9" />
+      <path d="M12 8V3" />
+      <path d="M20 21v-5" />
+      <path d="M20 12V3" />
+      <path d="M1 14h6" />
+      <path d="M9 8h6" />
+      <path d="M17 16h6" />
+    </NavGlyph>
+  ),
+  audio: (
+    <NavGlyph>
+      <path d="M12 2a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+      <path d="M12 16.5V19" />
+      <path d="M8 19h8" />
+    </NavGlyph>
+  ),
+  provider: (
+    <NavGlyph>
+      <rect x="3" y="4" width="18" height="7" rx="2" />
+      <rect x="3" y="13" width="18" height="7" rx="2" />
+      <path d="M7 7.5h.01" />
+      <path d="M7 16.5h.01" />
+    </NavGlyph>
+  ),
+  overlay: (
+    <NavGlyph>
+      <path d="m12 2 10 5-10 5L2 7l10-5Z" />
+      <path d="m2 17 10 5 10-5" />
+      <path d="m2 12 10 5 10-5" />
+    </NavGlyph>
+  ),
+  correction: (
+    <NavGlyph>
+      <path d="M9 12.5l2 2 4-4.5" />
+      <circle cx="12" cy="12" r="8.5" />
+    </NavGlyph>
+  ),
+};
+
 type QueueSnapshot = {
   state: string;
   current: { original: string; corrected?: string } | null;
@@ -218,25 +301,30 @@ export default function App() {
       <div className="flex flex-1 min-h-0">
         {/* Sidebar */}
         <aside className="w-56 shrink-0 flex flex-col bg-[var(--surface)] border-r border-[var(--line)]">
-          <nav className="flex-1 px-3 pt-4 pb-2 space-y-1 overflow-y-auto">
-          <p className="nav-group-label">Workspace</p>
-          {workspaceTabs.map(t => (
-            <NavItem
-              key={t.id}
-              active={tab === t.id}
-              count={t.count}
-              onClick={() => setTab(t.id)}
-            >
-              {t.label}
-            </NavItem>
-          ))}
+          <nav className="flex-1 px-3 pt-4 pb-2 overflow-y-auto">
+          <div className="space-y-1">
+            <p className="nav-group-label select-none">Workspace</p>
+            {workspaceTabs.map(t => (
+              <NavItem
+                key={t.id}
+                active={tab === t.id}
+                count={t.count}
+                icon={navIcons[t.id]}
+                onClick={() => setTab(t.id)}
+              >
+                {t.label}
+              </NavItem>
+            ))}
+          </div>
 
-          <p className="nav-group-label">Settings</p>
-          {settingsTabs.map(t => (
-            <NavItem key={t.id} active={tab === t.id} onClick={() => setTab(t.id)}>
-              {t.label}
-            </NavItem>
-          ))}
+          <div className="mt-7 space-y-1 border-t border-[var(--line)] pt-4">
+            <p className="nav-group-label select-none">Settings</p>
+            {settingsTabs.map(t => (
+              <NavItem key={t.id} active={tab === t.id} icon={navIcons[t.id]} onClick={() => setTab(t.id)}>
+                {t.label}
+              </NavItem>
+            ))}
+          </div>
         </nav>
 
         {/* Session status, always in view. */}
@@ -319,11 +407,13 @@ function WindowControl({
 function NavItem({
   active,
   count,
+  icon,
   onClick,
   children,
 }: {
   active: boolean;
   count?: number;
+  icon?: ReactNode;
   onClick: () => void;
   children: ReactNode;
 }) {
@@ -331,13 +421,16 @@ function NavItem({
     <button
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
-      className={`flex w-full items-center justify-between rounded-lg px-3 py-[7px] text-left text-[13.5px] transition-colors ${
+      className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-[7px] text-left text-[13.5px] transition-colors ${
         active
           ? 'bg-[var(--ink)] font-medium text-[var(--bg)]'
           : 'text-[var(--ink-soft)] hover:bg-[var(--hover)] hover:text-[var(--ink)]'
       }`}
     >
-      <span>{children}</span>
+      <span className="flex min-w-0 items-center gap-2.5">
+        {icon && <span className="inline-flex shrink-0 items-center opacity-75">{icon}</span>}
+        <span className="truncate">{children}</span>
+      </span>
       {count !== undefined && count > 0 && (
         <span
           className={`ml-2 rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums leading-none ${
