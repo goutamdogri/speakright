@@ -81,16 +81,16 @@ export function HistoryView() {
         <div className="divide-y divide-[var(--line)]">
           {filtered.map((entry, idx) => (
             <div key={entry.correction.id || idx} className="py-4 first:pt-0 last:pb-0">
-              <div className="text-[15px] text-stone-500 line-through decoration-red-300 decoration-1 leading-snug break-words">
+              <div className="text-[15px] text-[var(--muted)] line-through decoration-red-300 decoration-1 leading-snug break-words">
                 {entry.correction.originalText}
               </div>
-              <div className="text-[15px] font-medium text-stone-900 mt-1 leading-snug break-words">
+              <div className="text-[15px] font-medium text-[var(--ink)] mt-1 leading-snug break-words">
                 {entry.correction.correctedText}
               </div>
               {entry.issues.length > 0 && (
                 <div className="mt-2.5 space-y-1.5">
                   {entry.issues.map((issue, i) => (
-                    <div key={i} className="flex items-start gap-2 text-[13px] text-stone-500">
+                    <div key={i} className="flex items-start gap-2 text-[13px] text-[var(--muted)]">
                       <span className="inline-flex shrink-0 items-center rounded-md border border-[var(--line)] bg-[var(--field)] px-1.5 py-0.5 text-[11px] font-medium text-stone-600">
                         {issue.type}
                       </span>

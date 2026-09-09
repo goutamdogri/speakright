@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   general: {
     launchAtStartup: false,
     language: 'en',
+    theme: 'light',
   },
   audio: {
     deviceId: null,

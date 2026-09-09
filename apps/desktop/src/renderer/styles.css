@@ -3,23 +3,58 @@
 @tailwind utilities;
 
 /* ---------------------------------------------------------------------------
-   Design tokens — warm paper backdrop, ink text, one quiet green accent.
-   No gradients, no glows: the polish comes from spacing and type.
-   ------------------------------------------------------------------------- */
+   Design tokens — warm paper + ink + one quiet green accent.
+   Tokens swap automatically under `.dark`. No gradients anywhere.
+   ------------------------------------------------------------------------ */
 :root {
   --bg: #f7f6f4;
   --surface: #ffffff;
+  --field: #fbfbfa;
+  --hover: #f2f0ec;
   --ink: #211d1a;
   --ink-soft: #5c5753;
   --muted: #a09a94;
   --line: #e8e5e1;
   --line-strong: #d5d1cb;
-  --field: #fbfbfa;
+
   --accent: #388e6e;
   --accent-strong: #2c7357;
   --accent-soft: #eef5f1;
+
   --danger: #c2432f;
+  --danger-soft: #faedea;
   --warn: #a16207;
+  --warn-soft: #faf3e4;
+
+  /* Solid chrome (sidebar active item, primary buttons). */
+  --solid-bg: #211d1a;
+  --solid-bg-hover: #35302b;
+  --solid-text: #ffffff;
+}
+
+.dark {
+  --bg: #131210;
+  --surface: #1b1917;
+  --field: #22201d;
+  --hover: #292623;
+  --ink: #ede8e1;
+  --ink-soft: #b6afa6;
+  --muted: #827b73;
+  --line: #2d2a26;
+  --line-strong: #3e3a35;
+
+  --accent: #4ba183;
+  --accent-strong: #70c09d;
+  --accent-soft: #1e2c25;
+
+  --danger: #e17059;
+  --danger-soft: #2c1813;
+  --warn: #d49a3e;
+  --warn-soft: #2c2013;
+
+  --solid-bg: #ede8e1;
+  --solid-bg-hover: #f5f0ea;
+  --solid-text: #15130f;
 }
 
 html {
@@ -64,7 +99,7 @@ body {
 
 /* ---------------------------------------------------------------------------
    Form controls
-   ------------------------------------------------------------------------- */
+   ------------------------------------------------------------------------ */
 select {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a09a94' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
@@ -73,6 +108,10 @@ select {
   background-size: 1em;
   padding-right: 2.5rem;
   cursor: pointer;
+}
+
+.dark select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23827b73' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
 input[type="checkbox"] {
@@ -100,7 +139,7 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius: 99px;
   background: var(--ink);
   border: 2px solid var(--surface);
-  box-shadow: 0 1px 3px rgba(33, 29, 26, 0.28);
+  box-shadow: 0 1px 3px rgba(33, 29, 26, 0.22);
   transition: background 0.15s ease, transform 0.15s ease;
 }
 input[type="range"]::-webkit-slider-thumb:hover {
@@ -108,6 +147,10 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 input[type="range"]:active::-webkit-slider-thumb {
   transform: scale(1.12);
+}
+
+.dark input[type="range"]::-webkit-slider-thumb {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 
 /* One quiet, consistent entrance for content when switching tabs. */

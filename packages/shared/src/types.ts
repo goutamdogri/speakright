@@ -100,6 +100,8 @@ export interface AppSettings {
   general: {
     launchAtStartup: boolean;
     language: string;
+    /** UI appearance. Persisted here so it survives restarts. */
+    theme: 'light' | 'dark';
   };
   audio: AudioSettings;
   provider: ProviderSettings;

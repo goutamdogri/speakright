@@ -396,7 +396,7 @@ export function ProviderSettings({ settings, onUpdate }: Props) {
             onChange={e => setProvider({ useLocalOnly: e.target.checked })}
             className="h-4 w-4 rounded"
           />
-          <span className="text-sm text-stone-700">Force local-only mode (no cloud calls)</span>
+          <span className="text-sm text-[var(--ink-soft)]">Force local-only mode (no cloud calls)</span>
         </label>
       </Section>
     </>

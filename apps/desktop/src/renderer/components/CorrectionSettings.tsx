@@ -41,7 +41,7 @@ export function CorrectionSettings({ settings, onUpdate }: Props) {
       />
 
       <div className="pt-2">
-        <div className="text-[13px] font-medium text-stone-600 mb-1.5">Confidence threshold</div>
+        <div className="text-[13px] font-medium text-[var(--ink-soft)] mb-1.5">Confidence threshold</div>
         <input
           type="range"
           min={0}
