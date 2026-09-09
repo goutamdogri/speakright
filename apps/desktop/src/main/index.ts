@@ -39,7 +39,9 @@ function createSettingsWindow(): BrowserWindow {
     width: 1100,
     height: 700,
     show: false,
-    backgroundColor: '#f8fafc',
+    titleBarStyle: 'hidden',
+    autoHideMenuBar: true,
+    backgroundColor: '#f7f6f4',
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
       contextIsolation: true,
@@ -58,6 +60,9 @@ function createSettingsWindow(): BrowserWindow {
     win.show();
     win.focus();
   });
+
+  win.on('maximize', () => win.webContents.send(IPC.WINDOW_MAXIMIZE_CHANGED, true));
+  win.on('unmaximize', () => win.webContents.send(IPC.WINDOW_MAXIMIZE_CHANGED, false));
 
   win.on('closed', () => { settingsWindow = null; });
   settingsWindow = win;
@@ -300,6 +305,15 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.LIST_MODELS, (_e, kind: 'stt' | 'llm') => {
     return kind === 'llm' ? ctx.pipeline.listLlmModels() : ctx.pipeline.listSttModels();
   });
+
+  // Window controls (frameless settings window)
+  ipcMain.handle(IPC.WINDOW_MINIMIZE, () => settingsWindow?.minimize());
+  ipcMain.handle(IPC.WINDOW_TOGGLE_MAXIMIZE, () => {
+    if (!settingsWindow) return;
+    if (settingsWindow.isMaximized()) settingsWindow.unmaximize();
+    else settingsWindow.maximize();
+  });
+  ipcMain.handle(IPC.WINDOW_CLOSE, () => settingsWindow?.close());
 }
 
 /** Hide/show the overlay, pausing/resuming the display queue accordingly. */

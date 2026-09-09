@@ -94,6 +94,16 @@ const api = {
 
   // Model catalog for the currently selected STT/LLM providers.
   listModels: (kind: 'stt' | 'llm') => ipcRenderer.invoke(IPC.LIST_MODELS, kind) as Promise<string[]>,
+
+  // Window controls (frameless settings window title bar buttons)
+  minimizeWindow: () => ipcRenderer.invoke(IPC.WINDOW_MINIMIZE) as Promise<void>,
+  toggleMaximizeWindow: () => ipcRenderer.invoke(IPC.WINDOW_TOGGLE_MAXIMIZE) as Promise<void>,
+  closeWindow: () => ipcRenderer.invoke(IPC.WINDOW_CLOSE) as Promise<void>,
+  onMaximizeChange: (cb: (maximized: boolean) => void) => {
+    const listener = (_e: any, maximized: boolean) => cb(maximized);
+    ipcRenderer.on(IPC.WINDOW_MAXIMIZE_CHANGED, listener);
+    return () => ipcRenderer.removeListener(IPC.WINDOW_MAXIMIZE_CHANGED, listener);
+  },
 };
 
 contextBridge.exposeInMainWorld('speakright', api);

@@ -69,6 +69,7 @@ export default function App() {
   const [liveEvents, setLiveEvents] = useState<LiveEntry[]>([]);
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [queueInfo, setQueueInfo] = useState<QueueSnapshot>({ state: 'empty', current: null, pending: [] });
+  const [maximized, setMaximized] = useState(false);
 
   // Apply the chosen theme to the document root immediately when it changes.
   useEffect(() => {
@@ -110,12 +111,14 @@ export default function App() {
       if (ev.kind === 'speaking') setSpeaking(ev.value);
     });
 
+    const unsubMax = window.speakright.onMaximizeChange?.(setMaximized);
+
     // Poll the display queue so the Queue tab and badge stay current.
     const pollQueue = () => window.speakright.getQueue?.().then(setQueueInfo);
     pollQueue();
     const queueTimer = setInterval(pollQueue, 1000);
 
-    return () => { unsub?.(); unsubLive?.(); unsubState?.(); clearInterval(queueTimer); };
+    return () => { unsub?.(); unsubLive?.(); unsubState?.(); unsubMax?.(); clearInterval(queueTimer); };
   }, []);
 
   const updateSettings = (patch: Partial<AppSettings>) => {
@@ -137,6 +140,10 @@ export default function App() {
   const checkHealth = () => {
     window.speakright.checkProviders().then((h: ProviderHealth) => setHealth(h));
   };
+
+  const handleMinimize = () => window.speakright.minimizeWindow?.();
+  const handleToggleMaximize = () => window.speakright.toggleMaximizeWindow?.();
+  const handleClose = () => window.speakright.closeWindow?.();
 
   if (loading) {
     return (
@@ -174,22 +181,44 @@ export default function App() {
     { id: 'correction', label: 'Correction' },
   ];
 
-  const pageTitle =
-    tab === 'home' ? 'Home' :
-    tab === 'queue' ? 'Display queue' :
-    tab === 'history' ? 'History' :
-    (settingsTabs.find(t => t.id === tab)?.label ?? 'Home');
-
   return (
-    <div className="flex min-h-screen">
-      {/* Sidebar */}
-      <aside className="w-56 shrink-0 flex flex-col bg-[var(--surface)] border-r border-[var(--line)]">
-        <div className="flex items-baseline gap-0.5 px-5 pt-6 pb-3 select-none">
-          <span className="text-[19px] font-serif italic tracking-tight text-[var(--ink)]">SpeakRight</span>
-          <span className="text-[19px] font-serif italic text-[var(--accent)]">.</span>
+    <div className="flex flex-col h-screen overflow-hidden">
+      {/* Custom title bar: brand + window controls, matches the app design. */}
+      <div className="drag-region flex h-9 shrink-0 items-center justify-between border-b border-[var(--line)] bg-[var(--surface)]">
+        <span className="flex items-baseline gap-0.5 pl-4 select-none">
+          <span className="text-[14px] font-serif italic tracking-tight text-[var(--ink)]">SpeakRight</span>
+          <span className="text-[14px] font-serif italic text-[var(--accent)]">.</span>
+        </span>
+        <div className="flex h-full items-stretch">
+          <WindowControl label="Minimize" onClick={handleMinimize}>
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M1.5 6.5h9" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+            </svg>
+          </WindowControl>
+          <WindowControl label={maximized ? 'Restore' : 'Maximize'} onClick={handleToggleMaximize}>
+            {maximized ? (
+              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                <rect x="1.5" y="3" width="7" height="7" fill="none" stroke="currentColor" strokeWidth="1" />
+                <path d="M4 1.5h6.5V8" fill="none" stroke="currentColor" strokeWidth="1" />
+              </svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                <rect x="2" y="2" width="8" height="8" rx="0.5" fill="none" stroke="currentColor" strokeWidth="1" />
+              </svg>
+            )}
+          </WindowControl>
+          <WindowControl label="Close" onClick={handleClose} close>
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+          </WindowControl>
         </div>
+      </div>
 
-        <nav className="flex-1 px-3 py-2 space-y-1">
+      <div className="flex flex-1 min-h-0">
+        {/* Sidebar */}
+        <aside className="w-56 shrink-0 flex flex-col bg-[var(--surface)] border-r border-[var(--line)]">
+          <nav className="flex-1 px-3 pt-4 pb-2 space-y-1 overflow-y-auto">
           <p className="nav-group-label">Workspace</p>
           {workspaceTabs.map(t => (
             <NavItem
@@ -211,7 +240,7 @@ export default function App() {
         </nav>
 
         {/* Session status, always in view. */}
-        <div className="mx-3 mb-5 rounded-xl border border-[var(--line)] bg-[var(--field)] px-3.5 py-3">
+        <div className="mx-3 mb-5 rounded-xl border border-[var(--line)] bg-[var(--field)] px-3.5 py-3 sticky bottom-0">
           <div className="flex items-center gap-2">
             <span className={`h-2 w-2 rounded-full ${statusDot(listening)} ${listening === 'listening' ? 'animate-pulse' : ''}`} />
             <span className={`text-[13px] font-medium ${listening === 'listening' ? 'text-[var(--ink)]' : 'text-[var(--muted)]'}`}>
@@ -228,16 +257,8 @@ export default function App() {
       </aside>
 
       {/* Content */}
-      <div className="flex-1 min-w-0">
-        <header className="flex items-center justify-between px-10 pt-7 pb-4">
-          <h1 className="text-[15px] font-medium tracking-tight text-[var(--ink)]">{pageTitle}</h1>
-          <div className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-[13px] text-[var(--ink-soft)]">
-            <span className={`h-1.5 w-1.5 rounded-full ${statusDot(listening)} ${listening === 'listening' ? 'animate-pulse' : ''}`} />
-            {statusLabel(listening)}
-          </div>
-        </header>
-
-        <main className="px-10 pb-14 max-w-4xl">
+      <div className="flex-1 min-w-0 h-full overflow-y-auto">
+        <main className="px-10 py-7">
           {tab === 'home' && (
             <HomeView
               settings={settings}
@@ -262,8 +283,36 @@ export default function App() {
           {tab === 'correction' && <CorrectionSettings settings={settings} onUpdate={updateSettings} />}
           {tab === 'history' && <HistoryView />}
         </main>
+        </div>
       </div>
     </div>
+  );
+}
+
+function WindowControl({
+  label,
+  onClick,
+  close,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  close?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={`flex w-12 items-center justify-center text-[var(--muted)] transition-colors ${
+        close
+          ? 'hover:bg-[var(--danger)] hover:text-white'
+          : 'hover:bg-[var(--hover)] hover:text-[var(--ink)]'
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

@@ -59,6 +59,12 @@ export const IPC = {
   // Sessions
   START_SESSION: 'session:start',
   END_SESSION: 'session:end',
+
+  // Window controls (frameless title bar buttons used by the settings window)
+  WINDOW_MINIMIZE: 'window:minimize',
+  WINDOW_TOGGLE_MAXIMIZE: 'window:toggle-maximize',
+  WINDOW_CLOSE: 'window:close',
+  WINDOW_MAXIMIZE_CHANGED: 'window:maximize-changed',
 } as const;
 
 export type IPCChannel = (typeof IPC)[keyof typeof IPC];

@@ -189,6 +189,18 @@ input[type="range"]:active::-webkit-slider-thumb {
   color: var(--ink-soft);
 }
 
+/* Frameless window drag handle (native title bar is hidden). */
+.drag-region {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+.drag-region button,
+.drag-region a,
+.drag-region select,
+.drag-region input {
+  -webkit-app-region: no-drag;
+}
+
 /* Sidebar nav group captions. */
 .nav-group-label {
   padding: 0.5rem 0.75rem 0.25rem;
