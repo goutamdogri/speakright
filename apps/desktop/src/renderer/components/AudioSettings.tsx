@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Section, Field, inputCls } from './GeneralSettings';
+import { Section, Field, inputCls, GhostButton, RangeMeta } from './GeneralSettings';
 import type { AppSettings } from '@speakright/shared';
 
 interface Props {
@@ -45,6 +45,12 @@ export function AudioSettings({ settings, onUpdate }: Props) {
     }
   };
 
+  const hint = current
+    ? `Using: ${current.label || 'Microphone'}`
+    : devices.length === 0
+      ? 'No microphones detected yet — grant mic permission and click Refresh.'
+      : 'Using the system default microphone. Pick a device above if the built-in mic doesn\'t work.';
+
   return (
     <Section title="Audio Input">
       <Field label="Microphone">
@@ -64,24 +70,14 @@ export function AudioSettings({ settings, onUpdate }: Props) {
               <option value={current.deviceId}>{current.label}</option>
             )}
           </select>
-          <button
-            onClick={() => void loadDevices()}
-            className="px-3 py-2 rounded-md text-sm font-medium border border-slate-300 text-slate-600 hover:bg-slate-50 shrink-0"
-            disabled={refreshing}
-          >
-            {refreshing ? '…' : 'Refresh'}
-          </button>
+          <GhostButton onClick={() => void loadDevices()} disabled={refreshing} className="shrink-0">
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </GhostButton>
         </div>
-        <p className="text-xs text-slate-400 mt-1">
-          {current
-            ? `Using: ${current.label || 'Microphone'}`
-            : devices.length === 0
-              ? 'No microphones detected yet — grant mic permission and click Refresh.'
-              : 'Using the system default microphone. Pick a device above if the built-in mic doesn\'t work.'}
-        </p>
+        <p className="text-[13px] text-[var(--muted)] mt-1.5">{hint}</p>
       </Field>
 
-      <Field label="VAD Sensitivity">
+      <Field label="VAD sensitivity">
         <input
           type="range"
           min={0}
@@ -89,12 +85,11 @@ export function AudioSettings({ settings, onUpdate }: Props) {
           step={0.1}
           value={audio.vadSensitivity}
           onChange={e => onUpdate({ audio: { ...audio, vadSensitivity: parseFloat(e.target.value) } })}
-          className="w-full"
         />
-        <p className="text-xs text-slate-400">{audio.vadSensitivity} — higher is more sensitive</p>
+        <RangeMeta left="Strict" right="Sensitive" value={audio.vadSensitivity.toFixed(1)} />
       </Field>
 
-      <Field label={`Silence duration before utterance ends (${audio.silenceDurationMs} ms)`}>
+      <Field label="Silence before an utterance ends">
         <input
           type="range"
           min={300}
@@ -102,11 +97,11 @@ export function AudioSettings({ settings, onUpdate }: Props) {
           step={50}
           value={audio.silenceDurationMs}
           onChange={e => onUpdate({ audio: { ...audio, silenceDurationMs: parseInt(e.target.value) } })}
-          className="w-full"
         />
+        <RangeMeta value={`${audio.silenceDurationMs} ms`} />
       </Field>
 
-      <Field label={`Maximum utterance length (${audio.maxUtteranceMs / 1000} s)`}>
+      <Field label="Maximum utterance length">
         <input
           type="range"
           min={5000}
@@ -114,8 +109,8 @@ export function AudioSettings({ settings, onUpdate }: Props) {
           step={500}
           value={audio.maxUtteranceMs}
           onChange={e => onUpdate({ audio: { ...audio, maxUtteranceMs: parseInt(e.target.value) } })}
-          className="w-full"
         />
+        <RangeMeta value={`${(audio.maxUtteranceMs / 1000).toFixed(1)} s`} />
       </Field>
     </Section>
   );

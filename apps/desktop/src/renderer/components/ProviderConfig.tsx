@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Section, Field, inputCls } from './GeneralSettings';
+import { Section, Field, inputCls, GhostButton, SolidButton } from './GeneralSettings';
 import type { AppSettings, CloudProvider, SecretStatus } from '@speakright/shared';
 import { DEFAULT_CORRECTION_PROMPT } from '@speakright/shared';
 
@@ -44,37 +44,30 @@ function CorrectionPromptSection({ promptValue, onApply }: { promptValue: string
   const isCustom = promptValue !== DEFAULT_CORRECTION_PROMPT;
 
   return (
-    <Section title="LLM Correction Prompt">
-      <p className="text-xs text-slate-500 -mt-2 mb-2">
-        System prompt sent to the active LLM provider on every correction. Edits apply immediately to the next
-        correction — no restart required. Restore to go back to the built-in English-coach prompt.
+    <Section title="Correction prompt">
+      <p className="text-[13px] text-[var(--ink-soft)] -mt-2 mb-4 leading-relaxed">
+        The system prompt sent to the active LLM on every correction. Edits apply to the very next correction —
+        no restart required. Restore to return to the built-in English-coach prompt.
       </p>
       <Field label="System prompt">
         <textarea
-          className={`${inputCls} resize-y min-h-[220px] font-mono text-xs leading-relaxed`}
+          className={`${inputCls} resize-y min-h-[240px] font-mono text-[12px] leading-relaxed`}
           value={draft}
           onChange={e => setDraft(e.target.value)}
           spellCheck={false}
         />
       </Field>
-      <div className="flex items-center gap-2 mt-1">
-        <button
-          type="button"
-          disabled={draft === promptValue}
-          onClick={() => apply(draft)}
-          className="px-3 py-2 rounded-md text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40"
-        >
+      <div className="flex items-center gap-2.5 mt-2">
+        <SolidButton disabled={draft === promptValue} onClick={() => apply(draft)}>
           Apply &amp; save
-        </button>
-        <button
-          type="button"
+        </SolidButton>
+        <GhostButton
           disabled={!isCustom && draft === DEFAULT_CORRECTION_PROMPT}
           onClick={() => apply(DEFAULT_CORRECTION_PROMPT)}
-          className="px-3 py-2 rounded-md text-sm text-slate-700 border border-slate-300 hover:bg-slate-100 disabled:opacity-40"
         >
           Restore default
-        </button>
-        {saved && <span className="text-xs text-green-600">Saved — active immediately.</span>}
+        </GhostButton>
+        {saved && <span className="text-[13px] text-[var(--accent-strong)]">Saved — active now.</span>}
       </div>
     </Section>
   );
@@ -195,7 +188,7 @@ function CloudPanel({ provider, kind, model, onModelChange }: CloudPanelProps) {
   const options = models.includes(model) ? models : [model, ...models].filter(Boolean);
 
   return (
-    <div className="space-y-3 border border-slate-200 rounded-lg p-4 bg-slate-50">
+    <div className="mt-2 space-y-3 rounded-xl border border-[var(--line)] bg-[var(--field)] p-4">
       <Field label={`${provider} API key`}>
         <div className="flex gap-2">
           <input
@@ -206,27 +199,17 @@ function CloudPanel({ provider, kind, model, onModelChange }: CloudPanelProps) {
             placeholder={configured ? '•••••••• (replace — masked)' : `Enter ${provider} API key`}
             onChange={e => setKeyInput(e.target.value)}
           />
-          <button
-            type="button"
-            disabled={!keyInput.trim() || !canPersist}
-            onClick={saveKey}
-            className="px-3 py-2 rounded-md text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-40"
-          >
+          <SolidButton disabled={!keyInput.trim() || !canPersist} onClick={saveKey}>
             Save
-          </button>
-          <button
-            type="button"
-            disabled={!configured}
-            onClick={clearKey}
-            className="px-3 py-2 rounded-md text-sm text-slate-700 border border-slate-300 hover:bg-slate-100 disabled:opacity-40"
-          >
+          </SolidButton>
+          <GhostButton disabled={!configured} onClick={clearKey}>
             Clear
-          </button>
+          </GhostButton>
         </div>
-        <div className="text-xs text-slate-500 mt-1">
+        <div className="text-[13px] text-[var(--ink-soft)] mt-1.5">
           {status?.masked ? `Key ${status.masked} — ${sourceLabel}.` : `API key ${sourceLabel}.`}
           {!canPersist && (
-            <span className="text-amber-600 block mt-1">
+            <span className="block mt-1 text-[var(--warn)]">
               No OS keyring detected — the app cannot store keys here. Set
               SPEAKRIGHT_{provider.toUpperCase()}_API_KEY in a .env file instead
               (see apps/desktop/.env.example).
@@ -247,36 +230,28 @@ function CloudPanel({ provider, kind, model, onModelChange }: CloudPanelProps) {
               <option key={m} value={m}>{m}</option>
             ))}
           </select>
-          <button
-            type="button"
-            onClick={loadModels}
-            className="px-3 py-2 rounded-md text-sm text-slate-700 border border-slate-300 hover:bg-slate-100 disabled:opacity-40"
-          >
+          <GhostButton onClick={loadModels} className="shrink-0">
             {modelsLoading ? 'Fetching…' : 'Refresh'}
-          </button>
+          </GhostButton>
         </div>
-        <p className="text-xs text-slate-500 mt-1">
+        <p className="text-[13px] text-[var(--muted)] mt-1.5">
           Model list is fetched from {provider}'s API using your key (falls back to a curated list offline).
         </p>
       </Field>
 
-      <Field label="Test connection">
-        <button
-          type="button"
-          onClick={testConnection}
-          className="px-3 py-2 rounded-md text-sm text-slate-700 border border-slate-300 hover:bg-slate-100"
-        >
+      <Field label="Connection">
+        <GhostButton onClick={testConnection}>
           Test {kind === 'llm' ? 'LLM' : 'STT'} connection
-        </button>
+        </GhostButton>
         {health && (
-          <div className={`text-xs mt-1 ${health.ok ? 'text-green-600' : 'text-red-600'}`}>
+          <div className={`text-[13px] mt-1.5 ${health.ok ? 'text-[var(--accent-strong)]' : 'text-[var(--danger)]'}`}>
             {health.ok ? 'Connected — provider is reachable.' : health.message}
           </div>
         )}
       </Field>
 
-      {message && <p className="text-xs text-green-600">{message}</p>}
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {message && <p className="text-[13px] text-[var(--accent-strong)]">{message}</p>}
+      {error && <p className="text-[13px] text-[var(--danger)]">{error}</p>}
     </div>
   );
 }
@@ -303,7 +278,7 @@ export function ProviderSettings({ settings, onUpdate }: Props) {
 
   return (
     <>
-      <Section title="Speech-to-Text (STT) Provider">
+      <Section title="Speech-to-text">
         <Field label="Provider">
           <select
             className={inputCls}
@@ -346,16 +321,18 @@ export function ProviderSettings({ settings, onUpdate }: Props) {
             onModelChange={v => setProvider({ sttModel: v })}
           />
         )}
-        <p className="text-xs text-amber-600">
-          {provider.stt === 'local-whisper'
-            ? 'Local Whisper runs entirely offline. Download models with ./scripts/download-whisper-model.sh base|small|medium'
-            : provider.stt === 'sherpa-onnx'
-              ? 'Sherpa-ONNX streaming Zipformer runs entirely offline. Download the model with ./scripts/download-sherpa-model.sh'
-              : 'Cloud STT sends audio to an external service. Configure the API key below; keys are encrypted at rest.'}
-        </p>
+        <ProviderNote
+          text={
+            provider.stt === 'local-whisper'
+              ? 'Local Whisper runs entirely offline. Download models with ./scripts/download-whisper-model.sh base|small|medium'
+              : provider.stt === 'sherpa-onnx'
+                ? 'Sherpa-ONNX streaming Zipformer runs entirely offline. Download the model with ./scripts/download-sherpa-model.sh'
+                : 'Cloud STT sends audio to an external service. Keys are encrypted at rest.'
+          }
+        />
       </Section>
 
-      <Section title="Language Model (LLM) Provider">
+      <Section title="Language model">
         <Field label="Provider">
           <select
             className={inputCls}
@@ -385,11 +362,13 @@ export function ProviderSettings({ settings, onUpdate }: Props) {
             onModelChange={v => setProvider({ llmModel: v })}
           />
         )}
-        <p className="text-xs text-amber-600">
-          {provider.llm === 'ollama'
-            ? 'Ollama runs locally. Ensure Ollama is running and the model is pulled.'
-            : 'Cloud LLM sends your transcript to an external service. Configure the API key below; keys are encrypted at rest.'}
-        </p>
+        <ProviderNote
+          text={
+            provider.llm === 'ollama'
+              ? 'Ollama runs locally. Make sure Ollama is running and the model has been pulled.'
+              : 'Cloud LLM sends your transcript to an external service. Keys are encrypted at rest.'
+          }
+        />
       </Section>
 
       <CorrectionPromptSection
@@ -397,29 +376,35 @@ export function ProviderSettings({ settings, onUpdate }: Props) {
         onApply={value => onUpdate({ provider: { ...provider, llmPrompt: value } })}
       />
 
-      <Section title="Context & Privacy">
-        <Field label="Conversational context window (utterances)">
+      <Section title="Context & privacy">
+        <Field label="Conversational context window">
           <select
             className={inputCls}
             value={provider.contextWindowSize}
             onChange={e => setProvider({ contextWindowSize: parseInt(e.target.value) })}
           >
             <option value={0}>No context</option>
-            <option value={1}>1</option>
-            <option value={3}>3 (Recommended)</option>
-            <option value={5}>5</option>
+            <option value={1}>1 utterance</option>
+            <option value={3}>3 utterances (Recommended)</option>
+            <option value={5}>5 utterances</option>
           </select>
         </Field>
-        <label className="flex items-center gap-2 py-1 cursor-pointer">
+        <label className="flex items-center gap-2.5 cursor-pointer select-none">
           <input
             type="checkbox"
             checked={provider.useLocalOnly}
             onChange={e => setProvider({ useLocalOnly: e.target.checked })}
-            className="rounded border-slate-300"
+            className="h-4 w-4 rounded"
           />
-          <span className="text-sm text-slate-700">Force local-only mode (no cloud calls)</span>
+          <span className="text-sm text-stone-700">Force local-only mode (no cloud calls)</span>
         </label>
       </Section>
     </>
+  );
+}
+
+function ProviderNote({ text }: { text: string }) {
+  return (
+    <p className="mt-1 text-[13px] leading-relaxed text-[var(--muted)]">{text}</p>
   );
 }

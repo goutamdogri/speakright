@@ -1,4 +1,4 @@
-import { Section, Toggle } from './GeneralSettings';
+import { Section, Toggle, RangeMeta } from './GeneralSettings';
 import type { AppSettings } from '@speakright/shared';
 
 interface Props {
@@ -14,32 +14,34 @@ export function CorrectionSettings({ settings, onUpdate }: Props) {
   };
 
   return (
-    <Section title="Correction Behavior">
+    <Section title="What to correct">
       <Toggle
-        label="Correct grammar errors"
+        label="Grammar errors"
+        description="Tense, agreement, articles, prepositions."
         checked={correction.grammar}
         onChange={v => setCorrection({ grammar: v })}
       />
       <Toggle
-        label="Fix sentence structure"
+        label="Sentence structure"
+        description="Word order and awkward constructions."
         checked={correction.structure}
         onChange={v => setCorrection({ structure: v })}
       />
       <Toggle
-        label="Suggest better sentence formation"
+        label="Better alternatives"
+        description="Suggest more natural ways to say the same thing."
         checked={correction.formation}
         onChange={v => setCorrection({ formation: v })}
       />
       <Toggle
-        label="Show confirmations for already-correct sentences"
+        label="Confirmations"
+        description="Acknowledge sentences that were already correct."
         checked={correction.showConfirmations}
         onChange={v => setCorrection({ showConfirmations: v })}
       />
 
       <div className="pt-2">
-        <label className="block text-sm text-slate-600 mb-1">
-          Confidence threshold ({Math.round(correction.confidenceThreshold * 100)}%)
-        </label>
+        <div className="text-[13px] font-medium text-stone-600 mb-1.5">Confidence threshold</div>
         <input
           type="range"
           min={0}
@@ -47,10 +49,14 @@ export function CorrectionSettings({ settings, onUpdate }: Props) {
           step={0.05}
           value={correction.confidenceThreshold}
           onChange={e => setCorrection({ confidenceThreshold: parseFloat(e.target.value) })}
-          className="w-full"
         />
-        <p className="text-xs text-slate-400 mt-1">
-          Corrections below this confidence are hidden from the overlay.
+        <RangeMeta
+          left="Forgiving"
+          right="Strict"
+          value={`${Math.round(correction.confidenceThreshold * 100)}%`}
+        />
+        <p className="text-[13px] text-[var(--muted)] mt-2">
+          Corrections the model is less sure about than this are hidden from the overlay.
         </p>
       </div>
     </Section>

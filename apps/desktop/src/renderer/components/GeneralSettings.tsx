@@ -1,4 +1,5 @@
 import type { AppSettings } from '@speakright/shared';
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 interface Props {
   settings: AppSettings;
@@ -10,6 +11,7 @@ export function GeneralSettings({ settings, onUpdate }: Props) {
     <Section title="General">
       <Toggle
         label="Launch at system startup"
+        description="Open SpeakRight in the tray when you sign in."
         checked={settings.general.launchAtStartup}
         onChange={v => onUpdate({ general: { ...settings.general, launchAtStartup: v } })}
       />
@@ -27,7 +29,7 @@ export function GeneralSettings({ settings, onUpdate }: Props) {
 
       <Divider />
 
-      <Field label="Toggle Listening Hotkey">
+      <Field label="Toggle Listening hotkey">
         <input
           className={inputCls}
           value={settings.hotkeys.toggleListening}
@@ -35,7 +37,7 @@ export function GeneralSettings({ settings, onUpdate }: Props) {
           placeholder="Ctrl+Alt+E"
         />
       </Field>
-      <Field label="Pause/Resume Hotkey">
+      <Field label="Pause / Resume hotkey">
         <input
           className={inputCls}
           value={settings.hotkeys.pauseResume}
@@ -43,7 +45,7 @@ export function GeneralSettings({ settings, onUpdate }: Props) {
           placeholder="Ctrl+Alt+P"
         />
       </Field>
-      <Field label="Toggle Overlay Hotkey">
+      <Field label="Toggle Overlay hotkey">
         <input
           className={inputCls}
           value={settings.hotkeys.toggleOverlay}
@@ -55,49 +57,113 @@ export function GeneralSettings({ settings, onUpdate }: Props) {
   );
 }
 
-export function Section({ title, children }: { title: string; children: React.ReactNode }) {
+export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="bg-white rounded-lg border border-slate-200 p-6 mb-4">
-      <h2 className="text-sm font-semibold text-slate-700 mb-4">{title}</h2>
-      <div className="space-y-4">{children}</div>
+    <section className="bg-white rounded-2xl border border-[var(--line)] p-7 mb-5">
+      <header className="flex items-baseline justify-between mb-6">
+        <h2 className="text-[17px] font-semibold tracking-tight text-stone-900">{title}</h2>
+        <span className="h-px flex-1 bg-[var(--line)] mx-5" aria-hidden="true" />
+      </header>
+      <div className="space-y-5">{children}</div>
+    </section>
+  );
+}
+
+export function Toggle({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description?: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-8 py-1">
+      <div className="min-w-0">
+        <div className="text-sm font-medium text-stone-800">{label}</div>
+        {description && <p className="text-[13px] text-[var(--muted)] mt-0.5">{description}</p>}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => onChange(!checked)}
+        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ${
+          checked ? 'bg-[var(--accent)]' : 'bg-[var(--line-strong)]'
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-[0_1px_2px_rgba(33,29,26,0.25)] transition-transform duration-200 ${
+            checked ? 'translate-x-[22px]' : 'translate-x-0.5'
+          }`}
+        />
+      </button>
     </div>
   );
 }
 
-export function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <label className="flex items-center justify-between py-1 cursor-pointer">
-      <span className="text-sm text-slate-700">{label}</span>
-      <button
-        type="button"
-        onClick={() => onChange(!checked)}
-        className={`w-10 h-6 rounded-full transition-colors ${checked ? 'bg-blue-600' : 'bg-slate-300'}`}
-        aria-pressed={checked}
-      >
-        <span
-          className={`block w-4 h-4 bg-white rounded-full transform transition-transform ${
-            checked ? 'translate-x-5' : 'translate-x-1'
-          }`}
-        />
-      </button>
-    </label>
-  );
-}
-
-export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
-      <label className="block text-sm text-slate-600 mb-1">{label}</label>
+      <label className="block text-[13px] font-medium text-stone-600 mb-1.5">{label}</label>
       {children}
     </div>
   );
 }
 
 export const inputCls =
-  'w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500';
+  'w-full rounded-lg border border-[var(--line-strong)] bg-[var(--field)] px-3.5 py-2.5 text-sm text-stone-900 placeholder:text-[var(--muted)] transition-colors focus:outline-none focus:bg-white focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/25';
+
+/** Quiet, hairline-bordered secondary button. */
+export function GhostButton({
+  children,
+  className = '',
+  ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      {...rest}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--line-strong)] bg-white px-3.5 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 hover:text-stone-900 disabled:opacity-40 disabled:pointer-events-none ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Solid primary button — ink, not a brand rainbow. The listening toggle is
+    the one place allowed to use the green accent, for semantic clarity. */
+export function SolidButton({
+  children,
+  className = '',
+  ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      {...rest}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-lg bg-stone-900 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800 disabled:opacity-40 disabled:pointer-events-none ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
 
 export function Divider() {
-  return <hr className="border-slate-200" />;
+  return <hr className="border-[var(--line)]" />;
+}
+
+/** Compact label row under a range input: flanking captions + live value. */
+export function RangeMeta({ left, right, value }: { left?: string; right?: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between mt-1.5">
+      {left ? <span className="text-xs text-[var(--muted)]">{left}</span> : <span />}
+      <span className="text-xs font-medium tabular-nums text-[var(--accent-strong)]">{value}</span>
+      {right ? <span className="text-xs text-[var(--muted)]">{right}</span> : <span />}
+    </div>
+  );
 }
 
 export default GeneralSettings;

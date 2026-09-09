@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { AppSettings, ListeningState } from '@speakright/shared';
 import { ProviderSettings } from './components/ProviderConfig';
 import { AudioSettings } from './components/AudioSettings';
 import { OverlaySettings } from './components/OverlaySettings';
 import { HistoryView } from './components/HistoryList';
-import { GeneralSettings } from './components/GeneralSettings';
+import { GeneralSettings, GhostButton } from './components/GeneralSettings';
 import { CorrectionSettings } from './components/CorrectionSettings';
 
 type Tab = 'home' | 'queue' | 'general' | 'audio' | 'provider' | 'overlay' | 'correction' | 'history';
@@ -42,14 +43,20 @@ function statusLabel(state: ListeningState): string {
   }
 }
 
-function statusColor(state: ListeningState): string {
+function statusDot(state: ListeningState): string {
   switch (state) {
-    case 'listening': return 'bg-green-500';
-    case 'paused': return 'bg-amber-500';
-    case 'error': return 'bg-red-500';
-    default: return 'bg-slate-400';
+    case 'listening': return 'bg-[var(--accent)]';
+    case 'paused': return 'bg-[var(--warn)]';
+    case 'error': return 'bg-[var(--danger)]';
+    default: return 'bg-[var(--muted)]';
   }
 }
+
+type QueueSnapshot = {
+  state: string;
+  current: { original: string; corrected?: string } | null;
+  pending: { original: string; corrected?: string }[];
+};
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('home');
@@ -61,11 +68,7 @@ export default function App() {
   const [speaking, setSpeaking] = useState(false);
   const [liveEvents, setLiveEvents] = useState<LiveEntry[]>([]);
   const [overlayVisible, setOverlayVisible] = useState(true);
-  const [queueInfo, setQueueInfo] = useState<{
-    state: string;
-    current: { original: string; corrected?: string } | null;
-    pending: { original: string; corrected?: string }[];
-  }>({ state: 'empty', current: null, pending: [] });
+  const [queueInfo, setQueueInfo] = useState<QueueSnapshot>({ state: 'empty', current: null, pending: [] });
 
   useEffect(() => {
     if (!window.speakright) {
@@ -102,7 +105,7 @@ export default function App() {
       if (ev.kind === 'speaking') setSpeaking(ev.value);
     });
 
-    // Poll the display queue so the Home tab reflects what's waiting to show.
+    // Poll the display queue so the Queue tab and badge stay current.
     const pollQueue = () => window.speakright.getQueue?.().then(setQueueInfo);
     pollQueue();
     const queueTimer = setInterval(pollQueue, 1000);
@@ -132,8 +135,8 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen text-slate-500">
-        Loading...
+      <div className="flex items-center justify-center h-screen text-sm text-[var(--muted)]">
+        Loading…
       </div>
     );
   }
@@ -141,7 +144,7 @@ export default function App() {
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-6 py-4 max-w-md text-center text-sm">
+        <div className="bg-white border border-red-200 text-red-700 rounded-xl px-6 py-5 max-w-md text-center text-sm">
           {error}
         </div>
       </div>
@@ -150,255 +153,373 @@ export default function App() {
 
   if (!settings) return null;
 
-  const tabs: { id: Tab; label: string; count?: number }[] = [
+  const queueCount = queueInfo.pending.length + (queueInfo.current ? 1 : 0);
+
+  const workspaceTabs: { id: Tab; label: string; count?: number }[] = [
     { id: 'home', label: 'Home' },
-    { id: 'queue', label: 'Queue', count: queueInfo.pending.length + (queueInfo.current ? 1 : 0) },
+    { id: 'queue', label: 'Queue', count: queueCount },
+    { id: 'history', label: 'History' },
+  ];
+
+  const settingsTabs: { id: Tab; label: string }[] = [
     { id: 'general', label: 'General' },
     { id: 'audio', label: 'Audio' },
     { id: 'provider', label: 'Providers' },
     { id: 'overlay', label: 'Overlay' },
     { id: 'correction', label: 'Correction' },
-    { id: 'history', label: 'History' },
   ];
 
+  const pageTitle =
+    tab === 'home' ? 'Home' :
+    tab === 'queue' ? 'Display queue' :
+    tab === 'history' ? 'History' :
+    (settingsTabs.find(t => t.id === tab)?.label ?? 'Home');
+
   return (
-    <div className="min-h-screen">
-      <header className="bg-white border-b border-slate-200">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-slate-800">SpeakRight</h1>
-          <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${listening === 'listening' ? 'text-green-600' : 'text-slate-400'}`}>
-            <span className={`w-2 h-2 rounded-full ${statusColor(listening)} ${listening === 'listening' ? 'animate-pulse' : ''}`} />
-            {statusLabel(listening)}
-          </span>
+    <div className="flex min-h-screen">
+      {/* Sidebar — navigation, grouped. */}
+      <aside className="w-56 shrink-0 flex flex-col bg-white border-r border-[var(--line)]">
+        <div className="flex items-baseline gap-0.5 px-5 pt-6 pb-3 select-none">
+          <span className="text-[19px] font-serif italic tracking-tight text-stone-900">SpeakRight</span>
+          <span className="text-[19px] font-serif italic text-[var(--accent)]">.</span>
         </div>
-        <nav className="max-w-4xl mx-auto px-4 flex gap-1 pb-2">
-          {tabs.map(t => (
-            <button
+
+        <nav className="flex-1 px-3 py-2 space-y-1">
+          <p className="nav-group-label">Workspace</p>
+          {workspaceTabs.map(t => (
+            <NavItem
               key={t.id}
+              active={tab === t.id}
+              count={t.count}
               onClick={() => setTab(t.id)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                tab === t.id
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
             >
               {t.label}
-              {t.count !== undefined && t.count > 0 && (
-                <span
-                  className={`ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-[1.25rem] px-1 rounded-full text-[11px] font-semibold ${
-                    tab === t.id ? 'bg-white/25 text-white' : 'bg-blue-100 text-blue-700'
-                  }`}
-                >
-                  {t.count}
-                </span>
-              )}
-            </button>
+            </NavItem>
+          ))}
+
+          <p className="nav-group-label">Settings</p>
+          {settingsTabs.map(t => (
+            <NavItem key={t.id} active={tab === t.id} onClick={() => setTab(t.id)}>
+              {t.label}
+            </NavItem>
           ))}
         </nav>
-      </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-6">
-        {tab === 'home' && (
-          <div className="space-y-4">
-            <div className="bg-white rounded-lg border border-slate-200 p-6">
-              <h2 className="text-sm font-semibold text-slate-700 mb-2">Start listening</h2>
-              <p className="text-sm text-slate-500 mb-4">
-                Speak into your microphone and corrections will appear in the overlay.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={toggleListening}
-                  className={`px-6 py-3 rounded-lg text-white font-medium text-sm transition-colors ${
-                    listening === 'listening'
-                      ? 'bg-red-600 hover:bg-red-700'
-                      : 'bg-green-600 hover:bg-green-700'
-                  }`}
-                >
-                  {listening === 'listening' ? 'Stop Listening' : 'Start Listening'}
-                </button>
-                <button
-                  onClick={toggleOverlay}
-                  className={`px-6 py-3 rounded-lg font-medium text-sm transition-colors border ${
-                    overlayVisible
-                      ? 'text-slate-700 border-slate-300 hover:bg-slate-100'
-                      : 'text-blue-600 border-blue-300 bg-blue-50 hover:bg-blue-100'
-                  }`}
-                  title="Hides the always-on-top window without stopping listening or the queue"
-                >
-                  {overlayVisible ? 'Hide Overlay' : 'Show Overlay'}
-                </button>
-              </div>
-              <p className="text-xs text-slate-400 mt-3">
-                Keyboard shortcut: {settings.hotkeys.toggleListening}
-                {!overlayVisible && (
-                  <span className="text-amber-600 block mt-1">
-                    Overlay hidden — listening and the queue continue; nothing is shown until you reveal it again.
-                  </span>
-                )}
-              </p>
-            </div>
-
-            <div className="bg-white rounded-lg border border-slate-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-slate-700">Live transcript</h2>
-                <div className="flex items-center gap-3">
-                  {speaking ? (
-                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-600">
-                      <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                      Speaking…
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400">
-                      <span className={`w-2 h-2 rounded-full ${listening === 'listening' ? 'bg-slate-400' : 'bg-slate-300'}`} />
-                      {listening === 'listening' ? 'Listening…' : 'Stopped'}
-                    </span>
-                  )}
-                  <button
-                    onClick={() => setLiveEvents([])}
-                    className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
-              <p className="text-xs text-slate-400 mb-3">
-                This shows what your microphone hears — speech detection, the raw voice-to-text result, and any correction. If this stays empty while listening, your mic isn't being detected.
-              </p>
-              {liveEvents.length === 0 ? (
-                <div className="text-sm text-slate-400 py-6 text-center border border-dashed border-slate-200 rounded-lg">
-                  No speech detected yet. Start listening and speak.
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {liveEvents.map(ev => (
-                    <LiveEventRow key={ev.id} ev={ev} />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white rounded-lg border border-slate-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-slate-700">Providers</h2>
-                <button
-                  onClick={checkHealth}
-                  className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  Check health
-                </button>
-              </div>
-              {health ? (
-                <div className="space-y-3">
-                  <HealthGroup title="Speech-to-text" checks={health.stt} />
-                  <HealthGroup title="Language model" checks={health.llm} />
-                </div>
-              ) : (
-                <p className="text-sm text-slate-400">
-                  Click "Check health" to verify your STT / LLM providers are reachable.
-                </p>
-              )}
-            </div>
-
-            <div className="bg-white rounded-lg border border-slate-200 p-6">
-              <h2 className="text-sm font-semibold text-slate-700 mb-3">How to use</h2>
-              <ol className="space-y-2 text-sm text-slate-600 list-decimal list-inside">
-                <li>Click <span className="font-medium">Start Listening</span> (or press {settings.hotkeys.toggleListening}).</li>
-                <li>Speak naturally into your microphone.</li>
-                <li>Corrections appear in the overlay near the top of your screen.</li>
-                <li>Review your history in the <span className="font-medium">History</span> tab.</li>
-              </ol>
-            </div>
+        {/* Session status, always in view. */}
+        <div className="mx-3 mb-5 rounded-xl border border-[var(--line)] bg-[var(--field)] px-3.5 py-3">
+          <div className="flex items-center gap-2">
+            <span className={`h-2 w-2 rounded-full ${statusDot(listening)} ${listening === 'listening' ? 'animate-pulse' : ''}`} />
+            <span className={`text-[13px] font-medium ${listening === 'listening' ? 'text-stone-900' : 'text-stone-500'}`}>
+              {statusLabel(listening)}
+            </span>
           </div>
-        )}
-        {tab === 'queue' && (
-          <QueueTab queueInfo={queueInfo} overlayVisible={overlayVisible} onToggleOverlay={toggleOverlay} />
-        )}
-        {tab === 'general' && <GeneralSettings settings={settings} onUpdate={updateSettings} />}
-        {tab === 'audio' && <AudioSettings settings={settings} onUpdate={updateSettings} />}
-        {tab === 'provider' && <ProviderSettings settings={settings} onUpdate={updateSettings} />}
-        {tab === 'overlay' && <OverlaySettings settings={settings} onUpdate={updateSettings} />}
-        {tab === 'correction' && <CorrectionSettings settings={settings} onUpdate={updateSettings} />}
-        {tab === 'history' && <HistoryView />}
-      </main>
+          <p className="text-[11px] text-[var(--muted)] mt-1.5 leading-relaxed">
+            {listening === 'listening'
+              ? 'Say something — corrections appear in the overlay.'
+              : `Start listening with `}
+            {listening !== 'listening' && <span className="kbd">{settings.hotkeys.toggleListening}</span>}
+          </p>
+        </div>
+      </aside>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <header className="flex items-center justify-between px-10 pt-7 pb-4">
+          <h1 className="text-[15px] font-medium tracking-tight text-stone-900">{pageTitle}</h1>
+          <div className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-[13px] text-stone-600">
+            <span className={`h-1.5 w-1.5 rounded-full ${statusDot(listening)} ${listening === 'listening' ? 'animate-pulse' : ''}`} />
+            {statusLabel(listening)}
+          </div>
+        </header>
+
+        <main className="px-10 pb-14 max-w-4xl">
+          {tab === 'home' && (
+            <HomeView
+              settings={settings}
+              listening={listening}
+              speaking={speaking}
+              liveEvents={liveEvents}
+              health={health}
+              overlayVisible={overlayVisible}
+              onToggleListening={toggleListening}
+              onToggleOverlay={toggleOverlay}
+              onCheckHealth={checkHealth}
+              onClearLive={() => setLiveEvents([])}
+            />
+          )}
+          {tab === 'queue' && (
+            <QueueTab queueInfo={queueInfo} overlayVisible={overlayVisible} onToggleOverlay={toggleOverlay} />
+          )}
+          {tab === 'general' && <GeneralSettings settings={settings} onUpdate={updateSettings} />}
+          {tab === 'audio' && <AudioSettings settings={settings} onUpdate={updateSettings} />}
+          {tab === 'provider' && <ProviderSettings settings={settings} onUpdate={updateSettings} />}
+          {tab === 'overlay' && <OverlaySettings settings={settings} onUpdate={updateSettings} />}
+          {tab === 'correction' && <CorrectionSettings settings={settings} onUpdate={updateSettings} />}
+          {tab === 'history' && <HistoryView />}
+        </main>
+      </div>
     </div>
   );
 }
 
-function QueueTab({ queueInfo, overlayVisible, onToggleOverlay }: {
-  queueInfo: { state: string; current: { original: string; corrected?: string } | null; pending: { original: string; corrected?: string }[] };
-  overlayVisible: boolean;
-  onToggleOverlay: () => void;
+function NavItem({
+  active,
+  count,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  count?: number;
+  onClick: () => void;
+  children: ReactNode;
 }) {
-  const total = queueInfo.pending.length + (queueInfo.current ? 1 : 0);
   return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-lg border border-slate-200 p-6">
-        <div className="flex items-center justify-between mb-1">
-          <h2 className="text-sm font-semibold text-slate-700">Display queue</h2>
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
-            {total === 0 ? 'Empty' : `${total} item${total === 1 ? '' : 's'} in queue`}
+    <button
+      onClick={onClick}
+      aria-current={active ? 'page' : undefined}
+      className={`flex w-full items-center justify-between rounded-lg px-3 py-[7px] text-left text-[13.5px] transition-colors ${
+        active
+          ? 'bg-stone-900 font-medium text-white'
+          : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'
+      }`}
+    >
+      <span>{children}</span>
+      {count !== undefined && count > 0 && (
+        <span
+          className={`ml-2 rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums leading-none ${
+            active ? 'bg-white/20 text-white' : 'bg-stone-200 text-stone-700'
+          }`}
+        >
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
+function HomeView(props: {
+  settings: AppSettings;
+  listening: ListeningState;
+  speaking: boolean;
+  liveEvents: LiveEntry[];
+  health: ProviderHealth | null;
+  overlayVisible: boolean;
+  onToggleListening: () => void;
+  onToggleOverlay: () => void;
+  onCheckHealth: () => void;
+  onClearLive: () => void;
+}) {
+  const {
+    settings, listening, speaking, liveEvents, health,
+    overlayVisible, onToggleListening, onToggleOverlay, onCheckHealth, onClearLive,
+  } = props;
+  return (
+    <div className="space-y-5 page-enter">
+      {/* Hero / listening */}
+      <section className="bg-white rounded-2xl border border-[var(--line)] px-8 py-9">
+        <p className="text-sm text-[var(--muted)] mb-1.5">
+          {settings.general.language === 'hi' ? 'अपनी अंग्रेज़ी पर ध्यान दें' : 'Real-time spoken English coaching'}
+        </p>
+        <h2 className="font-serif text-[32px] leading-tight tracking-tight text-stone-900">
+          {listening === 'listening' ? 'You’re being heard.' : 'Speak more clearly.'}
+        </h2>
+        <p className="text-[15px] text-[var(--ink-soft)] mt-2 max-w-xl leading-relaxed">
+          {listening === 'listening'
+            ? 'Every sentence you say is checked as you go. Corrections surface in the overlay; the summary stays here.'
+            : 'Start listening, speak naturally, and SpeakRight will point out grammar, structure, and word-choice slips as they happen.'}
+        </p>
+        <div className="mt-7 flex flex-wrap items-center gap-3">
+          <button
+            onClick={onToggleListening}
+            className={`px-6 py-3 rounded-xl text-[15px] font-semibold text-white transition-colors ${
+              listening === 'listening'
+                ? 'bg-[var(--danger)] hover:bg-[#a93320]'
+                : 'bg-[var(--accent)] hover:bg-[var(--accent-strong)]'
+            }`}
+          >
+            {listening === 'listening' ? 'Stop listening' : 'Start listening'}
+          </button>
+          <GhostButton onClick={onToggleOverlay} className="px-6 py-3">
+            {overlayVisible ? 'Hide overlay' : 'Show overlay'}
+          </GhostButton>
+          <span className="text-[13px] text-[var(--muted)]">
+            or press <span className="kbd">{settings.hotkeys.toggleListening}</span>
           </span>
         </div>
-        <p className="text-xs text-slate-400 mb-4">
-          Corrections play one at a time here, each for its configured display duration. While the overlay is hidden the queue pauses, so everything spoken is still captured and replays in order when you show it again.
-        </p>
         {!overlayVisible && (
-          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700 flex items-center justify-between gap-3">
-            <span>Overlay is hidden — the queue is paused and accumulating.</span>
-            <button onClick={onToggleOverlay} className="text-xs font-semibold text-amber-800 hover:text-amber-900 whitespace-nowrap">
-              Show Overlay
+          <p className="mt-4 text-[13px] text-[var(--warn)]">
+            The overlay is hidden — guidance keeps queueing and will replay when you show it again.
+          </p>
+        )}
+      </section>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        {/* Live transcript */}
+        <section className="bg-white rounded-2xl border border-[var(--line)] p-6">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-[15px] font-semibold tracking-tight text-stone-900">Live transcript</h3>
+            <button
+              onClick={onClearLive}
+              className="text-[13px] font-medium text-[var(--muted)] transition-colors hover:text-stone-900"
+            >
+              Clear
             </button>
           </div>
-        )}
-        {queueInfo.current || queueInfo.pending.length > 0 ? (
-          <div className="space-y-3">
-            {queueInfo.current && (
-              <QueueItem label="Now showing" item={queueInfo.current} highlight />
-            )}
-            {queueInfo.pending.map((item, i) => (
-              <QueueItem key={i} label={i === 0 ? 'Next' : `#${i + 1}`} item={item} />
-            ))}
+          <p className="text-[13px] text-[var(--muted)] mb-4">
+            What your microphone heard, and whether anything needed fixing.
+          </p>
+          {liveEvents.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-[var(--line-strong)] py-10 text-center text-sm text-[var(--muted)]">
+              {speaking ? 'Listening…' : 'No speech detected yet. Start listening and speak.'}
+            </div>
+          ) : (
+            <div className="divide-y divide-[var(--line)] max-h-72 overflow-y-auto">
+              {liveEvents.map(ev => (
+                <LiveEventRow key={ev.id} ev={ev} />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Providers */}
+        <section className="bg-white rounded-2xl border border-[var(--line)] p-6">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-[15px] font-semibold tracking-tight text-stone-900">Providers</h3>
+            <button
+              onClick={onCheckHealth}
+              className="text-[13px] font-medium text-stone-600 transition-colors hover:text-stone-900"
+            >
+              Check health
+            </button>
           </div>
-        ) : (
-          <div className="text-sm text-slate-400 py-6 text-center border border-dashed border-slate-200 rounded-lg">
-            Nothing to display yet. Start listening and speak.
-          </div>
-        )}
+          <p className="text-[13px] text-[var(--muted)] mb-4">
+            Speech-to-text and language-model connections.
+          </p>
+          {health ? (
+            <div className="space-y-4">
+              <HealthGroup title="Speech-to-text" checks={health.stt} />
+              <HealthGroup title="Language model" checks={health.llm} />
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-[var(--line-strong)] py-10 text-center text-sm text-[var(--muted)]">
+              Run a check to verify your STT / LLM providers are reachable.
+            </div>
+          )}
+        </section>
       </div>
+
+      {/* How it works */}
+      <section className="bg-white rounded-2xl border border-[var(--line)] px-8 py-6">
+        <h3 className="text-[15px] font-semibold tracking-tight text-stone-900 mb-4">How it works</h3>
+        <ol className="grid gap-6 sm:grid-cols-3">
+          <Step n="01" title="Listen" text="Your microphone feeds SpeakRight through a local voice-activity detector." />
+          <Step n="02" title="Check" text="Each sentence is transcribed and reviewed in your spoken context." />
+          <Step n="03" title="Learn" text="Fixes appear in the overlay and are saved to History for later review." />
+        </ol>
+      </section>
     </div>
   );
 }
 
-function QueueItem({ label, item, highlight }: { label: string; item: { original: string; corrected?: string }; highlight?: boolean }) {
-  const corrected = item.corrected && item.corrected !== item.original;
+function Step({ n, title, text }: { n: string; title: string; text: string }) {
   return (
-    <div className={`rounded-lg border px-3 py-2 ${highlight ? 'border-green-300 bg-green-50' : 'border-slate-200'}`}>
-      <div className={`text-[11px] font-semibold uppercase tracking-wide mb-1 ${highlight ? 'text-green-600' : 'text-slate-400'}`}>
-        {label}
-      </div>
-      <div className="text-sm text-slate-700 line-through decoration-red-400 decoration-1 leading-snug">{item.original}</div>
-      {corrected && (
-        <div className="text-sm font-medium text-green-700 mt-0.5 leading-snug">{item.corrected}</div>
-      )}
-    </div>
+    <li>
+      <div className="font-serif italic text-2xl text-[var(--accent)]">{n}</div>
+      <div className="text-sm font-semibold text-stone-900 mt-1.5">{title}</div>
+      <p className="text-[13px] text-[var(--ink-soft)] leading-relaxed mt-1">{text}</p>
+    </li>
   );
 }
 
 function HealthGroup({ title, checks }: { title: string; checks: HealthCheck }) {
   return (
     <div>
-      <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">{title}</h3>
-      <div className="space-y-2">
+      <h4 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)] mb-2">{title}</h4>
+      <div className="divide-y divide-[var(--line)]">
         {Object.entries(checks).map(([name, h]) => (
-          <div key={name} className="flex items-center justify-between text-sm">
-            <span className="text-slate-600">{name}</span>
-            <span className={`inline-flex items-center gap-1.5 ${h.ok ? 'text-green-600' : 'text-red-600'}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${h.ok ? 'bg-green-500' : 'bg-red-500'}`} />
+          <div key={name} className="flex items-center justify-between py-2 text-sm">
+            <span className="text-stone-600">{name}</span>
+            <span className={`inline-flex items-center gap-2 font-medium ${h.ok ? 'text-[var(--accent-strong)]' : 'text-[var(--danger)]'}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${h.ok ? 'bg-[var(--accent)]' : 'bg-[var(--danger)]'}`} />
               {h.ok ? 'Ready' : h.message}
             </span>
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function QueueTab(props: {
+  queueInfo: QueueSnapshot;
+  overlayVisible: boolean;
+  onToggleOverlay: () => void;
+}) {
+  const { queueInfo, overlayVisible, onToggleOverlay } = props;
+  const total = queueInfo.pending.length + (queueInfo.current ? 1 : 0);
+  return (
+    <div className="space-y-5 page-enter">
+      <section className="bg-white rounded-2xl border border-[var(--line)] p-7">
+        <div className="flex items-baseline justify-between mb-1">
+          <h2 className="text-[15px] font-semibold tracking-tight text-stone-900">Pending corrections</h2>
+          <span className="text-[13px] text-[var(--muted)] tabular-nums">
+            {total === 0 ? 'Empty come back later' : `${total} ${total === 1 ? 'item' : 'items'} waiting`}
+          </span>
+        </div>
+        <p className="text-[13px] text-[var(--muted)] mb-5">
+          Each item plays on the overlay for its display duration. While the overlay is hidden, the queue pauses and everything you say still accumulates here.
+        </p>
+
+        {!overlayVisible && (
+          <div className="mb-5 flex items-center justify-between gap-4 rounded-xl border border-[var(--warn)]/30 bg-amber-50/60 px-4 py-3 text-sm text-[var(--warn)]">
+            <span>Overlay hidden — the queue is paused and accumulating.</span>
+            <button onClick={onToggleOverlay} className="shrink-0 font-semibold text-stone-900 hover:text-[var(--accent-strong)] transition-colors">
+              Show overlay
+            </button>
+          </div>
+        )}
+
+        {queueInfo.current || queueInfo.pending.length > 0 ? (
+          <div className="space-y-2.5">
+            {queueInfo.current && (
+              <div className="rounded-xl border border-transparent bg-[var(--accent-soft)]">
+                <QueueItem label="Now showing" item={queueInfo.current} />
+              </div>
+            )}
+            {queueInfo.pending.map((item, i) => (
+              <div key={i} className="rounded-xl border border-[var(--line)]">
+                <QueueItem label={i === 0 ? 'Next' : `#${i + 1}`} item={item} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-[var(--line-strong)] py-10 text-center text-sm text-[var(--muted)]">
+            Nothing to display yet. Start listening and speak.
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function QueueItem({ label, item }: { label: string; item: { original: string; corrected?: string } }) {
+  const corrected = item.corrected && item.corrected !== item.original;
+  return (
+    <div className="px-4 py-3.5">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">{label}</span>
+        {label === 'Now showing' && (
+          <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--accent)]">on screen</span>
+        )}
+      </div>
+      <div className="text-[15px] text-stone-500 line-through decoration-red-300 decoration-1 leading-snug break-words">
+        {item.original}
+      </div>
+      {corrected && (
+        <div className="text-[15px] font-medium text-stone-900 mt-1 leading-snug break-words">
+          {item.corrected}
+        </div>
+      )}
     </div>
   );
 }
@@ -409,44 +530,49 @@ function fmtTime(at: number): string {
 }
 
 function LiveEventRow({ ev }: { ev: LiveEntry }) {
-  const [time, label] = eventContent(ev);
+  const [time, content] = eventContent(ev);
   return (
-    <div className="flex items-start gap-2 text-sm">
-      <span className="text-slate-400 text-xs pt-0.5 whitespace-nowrap tabular-nums">{time}</span>
-      <span className="text-slate-700 min-w-0">
-        {label.prefix}
-        {label.text && (
-          <span className={`font-medium break-words ${label.tone === 'green' ? 'text-green-700' : label.tone === 'red' ? 'text-red-600' : 'text-slate-800'}`}>
-            {label.text}
-          </span>
-        )}
+    <div className="flex items-baseline gap-3 py-2.5">
+      <span className="w-12 shrink-0 pt-0.5 text-right font-mono text-[11px] text-[var(--muted)] tabular-nums">
+        {time}
+      </span>
+      <span className="flex min-w-0 items-center gap-2 text-sm">
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${content.dot}`} />
+        <span className={`min-w-0 break-words leading-snug ${content.textClass}`}>
+          {content.text}
+        </span>
       </span>
     </div>
   );
 }
 
-function eventContent(ev: LiveEvent): [string, { prefix: string; text?: string; tone?: 'green' | 'red' | 'default' }] {
+function eventContent(
+  ev: LiveEvent,
+): [string, { text: string; dot: string; textClass: string }] {
+  const gray = 'bg-[var(--line-strong)] text-stone-600';
+  const green = 'bg-[var(--accent)] text-[var(--accent-strong)]';
+  const red = 'bg-[var(--danger)] text-[var(--danger)]';
   switch (ev.kind) {
     case 'speaking':
       return [fmtTime(ev.at), ev.value
-        ? { prefix: '🎤 ', text: 'Speech detected — recording…', tone: 'green' }
-        : { prefix: ' ', text: 'Silence' }];
+        ? { text: 'Speech detected — recording…', dot: green, textClass: 'text-stone-800 font-medium' }
+        : { text: 'Silence', dot: gray, textClass: 'text-[var(--muted)]' }];
     case 'utterance-received':
-      return [fmtTime(ev.at), { prefix: '📥 ', text: `Utterance captured (${(ev.durationMs / 1000).toFixed(1)}s)` }];
+      return [fmtTime(ev.at), { text: `Utterance captured (${(ev.durationMs / 1000).toFixed(1)}s)`, dot: gray, textClass: 'text-stone-700' }];
     case 'transcribing':
-      return [fmtTime(ev.at), { prefix: '⚙️ ', text: 'Converting speech to text…' }];
+      return [fmtTime(ev.at), { text: 'Converting speech to text…', dot: gray, textClass: 'text-stone-700' }];
     case 'transcript':
-      return [fmtTime(ev.at), { prefix: '📝 ', text: ev.text, tone: 'default' }];
+      return [fmtTime(ev.at), { text: ev.text, dot: gray, textClass: 'text-stone-800' }];
     case 'correcting':
-      return [fmtTime(ev.at), { prefix: '🧠 ', text: 'Running grammar check…' }];
+      return [fmtTime(ev.at), { text: 'Running grammar check…', dot: gray, textClass: 'text-stone-700' }];
     case 'correction':
       if (!ev.hasCorrection) {
-        return [fmtTime(ev.at), { prefix: '✅ ', text: 'Looks correct — no fix needed', tone: 'green' }];
+        return [fmtTime(ev.at), { text: 'Looks correct — no fix needed', dot: green, textClass: 'text-stone-700' }];
       }
-      return [fmtTime(ev.at), { prefix: '✨ ', text: `${ev.original} → ${ev.corrected}`, tone: 'green' }];
+      return [fmtTime(ev.at), { text: `${ev.original} → ${ev.corrected}`, dot: green, textClass: 'text-stone-800' }];
     case 'skipped':
-      return [fmtTime(ev.at), { prefix: '⏭️ ', text: ev.reason }];
+      return [fmtTime(ev.at), { text: ev.reason, dot: gray, textClass: 'text-[var(--muted)]' }];
     case 'error':
-      return [fmtTime(ev.at), { prefix: '⚠️ ', text: ev.message, tone: 'red' }];
+      return [fmtTime(ev.at), { text: ev.message, dot: red, textClass: 'text-[var(--danger)]' }];
   }
 }

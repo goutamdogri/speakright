@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Section, inputCls } from './GeneralSettings';
+import { Section, inputCls, GhostButton } from './GeneralSettings';
 
 interface HistoryEntry {
   session: any;
@@ -7,6 +7,8 @@ interface HistoryEntry {
   correction: any;
   issues: any[];
 }
+
+const ISSUE_TYPES = ['grammar', 'structure', 'formation'];
 
 export function HistoryView() {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
@@ -36,26 +38,26 @@ export function HistoryView() {
   });
 
   return (
-    <Section title="Correction History">
-      <div className="flex gap-2 mb-4">
+    <Section title="Correction history">
+      <div className="flex flex-wrap gap-2 mb-5">
         <input
-          className={inputCls}
-          placeholder="Search by text..."
+          className={`${inputCls} max-w-xs`}
+          placeholder="Search by text…"
           value={query}
           onChange={e => setQuery(e.target.value)}
         />
         <select
-          className={inputCls + ' w-40'}
+          className={`${inputCls} w-40`}
           value={issueType}
           onChange={e => setIssueType(e.target.value)}
         >
           <option value="">All types</option>
-          <option value="grammar">Grammar</option>
-          <option value="structure">Structure</option>
-          <option value="formation">Formation</option>
+          {ISSUE_TYPES.map(t => (
+            <option key={t} value={t}>{t[0].toUpperCase() + t.slice(1)}</option>
+          ))}
         </select>
-        <button
-          className="px-4 py-2 bg-red-50 text-red-600 rounded-md text-sm hover:bg-red-100"
+        <GhostButton
+          className="border-red-200 text-[var(--danger)] hover:bg-red-50 hover:text-[var(--danger)]"
           onClick={async () => {
             if (confirm('Clear all history?')) {
               await window.speakright.clearHistory();
@@ -63,45 +65,46 @@ export function HistoryView() {
             }
           }}
         >
-          Clear
-        </button>
+          Clear all
+        </GhostButton>
       </div>
 
       {loading ? (
-        <p className="text-slate-400 text-sm">Loading...</p>
+        <p className="text-sm text-[var(--muted)]">Loading…</p>
       ) : filtered.length === 0 ? (
-        <p className="text-slate-400 text-sm">No corrections found yet.</p>
+        <div className="rounded-xl border border-dashed border-[var(--line-strong)] py-10 text-center text-sm text-[var(--muted)]">
+          {entries.length === 0
+            ? 'No corrections yet. They’ll appear here as you speak.'
+            : 'Nothing matches your filters.'}
+        </div>
       ) : (
-        <div className="space-y-3">
+        <div className="divide-y divide-[var(--line)]">
           {filtered.map((entry, idx) => (
-            <div
-              key={entry.correction.id || idx}
-              className="border border-slate-200 rounded-lg p-3"
-            >
-              <div className="text-sm text-slate-500 line-through decoration-red-400">
+            <div key={entry.correction.id || idx} className="py-4 first:pt-0 last:pb-0">
+              <div className="text-[15px] text-stone-500 line-through decoration-red-300 decoration-1 leading-snug break-words">
                 {entry.correction.originalText}
               </div>
-              <div className="text-sm text-green-600 mt-1 font-medium">
+              <div className="text-[15px] font-medium text-stone-900 mt-1 leading-snug break-words">
                 {entry.correction.correctedText}
               </div>
               {entry.issues.length > 0 && (
-                <div className="mt-2 space-y-1">
+                <div className="mt-2.5 space-y-1.5">
                   {entry.issues.map((issue, i) => (
-                    <div key={i} className="text-xs text-slate-500">
-                      <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 mr-2">
+                    <div key={i} className="flex items-start gap-2 text-[13px] text-stone-500">
+                      <span className="inline-flex shrink-0 items-center rounded-md border border-[var(--line)] bg-[var(--field)] px-1.5 py-0.5 text-[11px] font-medium text-stone-600">
                         {issue.type}
                       </span>
-                      {issue.explanation}
+                      <span className="leading-snug">{issue.explanation}</span>
                     </div>
                   ))}
                 </div>
               )}
-              <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
-                <span>
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-xs text-[var(--muted)] tabular-nums">
                   {new Date(entry.correction.createdAt).toLocaleString()}
                 </span>
                 <button
-                  className="text-red-500 hover:text-red-600"
+                  className="text-[13px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--danger)]"
                   onClick={async () => {
                     await window.speakright.deleteHistoryItem(entry.correction.id);
                     loadHistory();

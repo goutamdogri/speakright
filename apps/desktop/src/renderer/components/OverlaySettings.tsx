@@ -1,4 +1,4 @@
-import { Section, Field, inputCls } from './GeneralSettings';
+import { Section, Field, inputCls, RangeMeta } from './GeneralSettings';
 import type { AppSettings } from '@speakright/shared';
 
 interface Props {
@@ -15,7 +15,7 @@ export function OverlaySettings({ settings, onUpdate }: Props) {
 
   return (
     <Section title="Overlay Display">
-      <Field label="Width (px)">
+      <Field label={`Width — ${overlay.width} px`}>
         <input
           type="number"
           className={inputCls}
@@ -26,7 +26,7 @@ export function OverlaySettings({ settings, onUpdate }: Props) {
         />
       </Field>
 
-      <Field label={`Opacity (${Math.round(overlay.opacity * 100)}%)`}>
+      <Field label="Opacity">
         <input
           type="range"
           min={0.3}
@@ -34,11 +34,11 @@ export function OverlaySettings({ settings, onUpdate }: Props) {
           step={0.05}
           value={overlay.opacity}
           onChange={e => setOverlay({ opacity: parseFloat(e.target.value) })}
-          className="w-full"
         />
+        <RangeMeta value={`${Math.round(overlay.opacity * 100)}%`} />
       </Field>
 
-      <Field label={`Font size (${overlay.fontSize}px)`}>
+      <Field label="Font size">
         <input
           type="range"
           min={10}
@@ -46,11 +46,11 @@ export function OverlaySettings({ settings, onUpdate }: Props) {
           step={1}
           value={overlay.fontSize}
           onChange={e => setOverlay({ fontSize: parseInt(e.target.value) })}
-          className="w-full"
         />
+        <RangeMeta value={`${overlay.fontSize} px`} />
       </Field>
 
-      <Field label={`Display duration (${overlay.displayDurationMs / 1000}s)`}>
+      <Field label="Display duration per correction">
         <input
           type="range"
           min={3000}
@@ -58,10 +58,10 @@ export function OverlaySettings({ settings, onUpdate }: Props) {
           step={500}
           value={overlay.displayDurationMs}
           onChange={e => setOverlay({ displayDurationMs: parseInt(e.target.value) })}
-          className="w-full"
         />
-        <p className="text-xs text-slate-400 mt-1">
-          Minimum time each correction stays visible before the next one appears.
+        <RangeMeta value={`${(overlay.displayDurationMs / 1000).toFixed(1)} s`} />
+        <p className="text-[13px] text-[var(--muted)] mt-2">
+          Minimum time each correction stays visible before the next one appears. Applies immediately — no restart needed.
         </p>
       </Field>
 
@@ -76,7 +76,7 @@ export function OverlaySettings({ settings, onUpdate }: Props) {
         />
       </Field>
 
-      <p className="text-xs text-slate-400 mt-2">
+      <p className="text-[13px] text-[var(--muted)]">
         Drag the overlay to reposition it. Its position is saved automatically.
       </p>
     </Section>
