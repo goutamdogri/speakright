@@ -57,7 +57,14 @@
   --solid-text: #15130f;
 }
 
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
 html {
+  background: var(--bg);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
