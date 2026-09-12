@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AppSettings, ListeningState } from '@speakright/shared';
 import { ProviderSettings } from './components/ProviderConfig';
@@ -460,6 +460,20 @@ function HomeView(props: {
     settings, listening, speaking, liveEvents, health,
     overlayVisible, onToggleListening, onToggleOverlay, onCheckHealth, onClearLive,
   } = props;
+
+  const liveRef = useRef<HTMLDivElement | null>(null);
+  const pinned = useRef(true);
+
+  useEffect(() => {
+    const el = liveRef.current;
+    if (el && pinned.current) el.scrollTop = 0;
+  }, [liveEvents]);
+
+  const handleLiveScroll = () => {
+    const el = liveRef.current;
+    if (el) pinned.current = el.scrollTop < 24;
+  };
+
   return (
     <div className="space-y-5 page-enter">
       {/* Hero */}
@@ -500,36 +514,39 @@ function HomeView(props: {
         )}
       </section>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        {/* Live transcript */}
-        <section className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] p-6">
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="text-[15px] font-semibold tracking-tight text-[var(--ink)]">Live transcript</h3>
-            <button
-              onClick={onClearLive}
-              className="text-[13px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--ink)]"
-            >
-              Clear
-            </button>
+      {/* Live transcript */}
+      <section className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] p-6">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-[15px] font-semibold tracking-tight text-[var(--ink)]">Live transcript</h3>
+          <button
+            onClick={onClearLive}
+            className="text-[13px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--ink)]"
+          >
+            Clear
+          </button>
+        </div>
+        <p className="text-[13px] text-[var(--muted)] mb-4">
+          What your microphone heard, and whether anything needed fixing.
+        </p>
+        {liveEvents.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-[var(--line-strong)] py-10 text-center text-sm text-[var(--muted)]">
+            {speaking ? 'Listening…' : 'No speech detected yet. Start listening and speak.'}
           </div>
-          <p className="text-[13px] text-[var(--muted)] mb-4">
-            What your microphone heard, and whether anything needed fixing.
-          </p>
-          {liveEvents.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-[var(--line-strong)] py-10 text-center text-sm text-[var(--muted)]">
-              {speaking ? 'Listening…' : 'No speech detected yet. Start listening and speak.'}
-            </div>
-          ) : (
-            <div className="divide-y divide-[var(--line)] max-h-72 overflow-y-auto">
-              {liveEvents.map(ev => (
-                <LiveEventRow key={ev.id} ev={ev} />
-              ))}
-            </div>
-          )}
-        </section>
+        ) : (
+          <div
+            ref={liveRef}
+            onScroll={handleLiveScroll}
+            className="divide-y divide-[var(--line)] max-h-80 overflow-y-auto"
+          >
+            {liveEvents.slice().reverse().map(ev => (
+              <LiveEventRow key={ev.id} ev={ev} />
+            ))}
+          </div>
+        )}
+      </section>
 
-        {/* Providers */}
-        <section className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] p-6">
+      {/* Providers */}
+      <section className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] p-6">
           <div className="flex items-center justify-between mb-1">
             <h3 className="text-[15px] font-semibold tracking-tight text-[var(--ink)]">Providers</h3>
             <button
@@ -553,7 +570,6 @@ function HomeView(props: {
             </div>
           )}
         </section>
-      </div>
 
       {/* How it works */}
       <section className="bg-[var(--surface)] rounded-2xl border border-[var(--line)] px-8 py-6">
